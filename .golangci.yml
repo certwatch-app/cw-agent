@@ -1,0 +1,69 @@
+# golangci-lint configuration
+# https://golangci-lint.run/usage/configuration/
+
+run:
+  timeout: 5m
+  issues-exit-code: 1
+  tests: true
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gofmt
+    - goimports
+    - misspell
+    - unconvert
+    - bodyclose
+    - noctx
+    - gosec
+    - prealloc
+    - copyloopvar  # Replacement for deprecated exportloopref
+    - gocritic
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment  # Disabled: manual field ordering for clarity over memory optimization
+
+  gofmt:
+    simplify: true
+
+  goimports:
+    local-prefixes: github.com/certwatch-app/cw-agent
+
+  misspell:
+    locale: US
+
+  gosec:
+    excludes:
+      - G104 # Audit errors not checked (we handle in specific cases)
+      - G304 # File path provided as taint input (config files)
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+    disabled-checks:
+      - hugeParam
+
+issues:
+  exclude-rules:
+    # Exclude some linters from running on tests files
+    - path: _test\.go
+      linters:
+        - gosec
+        - gocritic
+
+  max-issues-per-linter: 50
+  max-same-issues: 10

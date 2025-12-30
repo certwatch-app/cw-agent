@@ -1,0 +1,39 @@
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+cw-agent
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+coverage.out
+coverage.html
+
+# Dependency directories
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Config with secrets
+certwatch.yaml
+!certwatch.example.yaml
+
+# Build artifacts
+dist/
+
+# GoReleaser
+/dist/

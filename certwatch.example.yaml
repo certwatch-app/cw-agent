@@ -1,0 +1,64 @@
+# CertWatch Agent Configuration
+# Copy this file to certwatch.yaml and update with your settings
+
+# API Configuration
+api:
+  # CertWatch API endpoint
+  endpoint: "https://api.certwatch.app"
+
+  # API key with 'cloud:sync' scope
+  # Get this from your CertWatch dashboard: Settings > API Keys
+  key: "cw_xxxxxxxx_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+  # Request timeout
+  timeout: 30s
+
+# Agent Configuration
+agent:
+  # Unique name for this agent (appears in dashboard)
+  name: "production-monitor"
+
+  # How often to sync data with CertWatch cloud
+  sync_interval: 5m
+
+  # How often to scan certificates locally
+  scan_interval: 1m
+
+  # Maximum concurrent certificate scans
+  concurrency: 10
+
+  # Log level: debug, info, warn, error
+  log_level: info
+
+# Certificates to Monitor
+certificates:
+  # Example: Monitor a web server
+  - hostname: "www.example.com"
+    port: 443
+    tags:
+      - production
+      - web
+    notes: "Main website"
+
+  # Example: Monitor an API endpoint
+  - hostname: "api.example.com"
+    port: 443
+    tags:
+      - production
+      - api
+    notes: "REST API"
+
+  # Example: Monitor a mail server
+  - hostname: "mail.example.com"
+    port: 993
+    tags:
+      - production
+      - mail
+    notes: "IMAP server"
+
+  # Example: Monitor internal service
+  - hostname: "internal-service.local"
+    port: 8443
+    tags:
+      - internal
+    notes: "Internal microservice"

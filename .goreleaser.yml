@@ -1,0 +1,142 @@
+# GoReleaser configuration for cw-agent
+# https://goreleaser.com
+
+version: 2
+
+project_name: cw-agent
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: cw-agent
+    main: ./cmd/cw-agent
+    binary: cw-agent
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+      - -X github.com/certwatch-app/cw-agent/internal/version.Version={{.Version}}
+      - -X github.com/certwatch-app/cw-agent/internal/version.GitCommit={{.ShortCommit}}
+      - -X github.com/certwatch-app/cw-agent/internal/version.BuildDate={{.Date}}
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    files:
+      - README.md
+      - LICENSE
+      - certwatch.example.yaml
+
+checksum:
+  name_template: 'checksums.txt'
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - '^ci:'
+      - Merge pull request
+      - Merge branch
+
+release:
+  github:
+    owner: certwatch-app
+    name: cw-agent
+  draft: false
+  prerelease: auto
+  name_template: "v{{.Version}}"
+
+dockers:
+  - image_templates:
+      - "ghcr.io/certwatch-app/cw-agent:{{ .Version }}-amd64"
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--build-arg=VERSION={{.Version}}"
+      - "--build-arg=GIT_COMMIT={{.ShortCommit}}"
+      - "--build-arg=BUILD_DATE={{.Date}}"
+    dockerfile: Dockerfile
+    goos: linux
+    goarch: amd64
+
+  - image_templates:
+      - "ghcr.io/certwatch-app/cw-agent:{{ .Version }}-arm64"
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--build-arg=VERSION={{.Version}}"
+      - "--build-arg=GIT_COMMIT={{.ShortCommit}}"
+      - "--build-arg=BUILD_DATE={{.Date}}"
+    dockerfile: Dockerfile
+    goos: linux
+    goarch: arm64
+
+docker_manifests:
+  - name_template: "ghcr.io/certwatch-app/cw-agent:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/certwatch-app/cw-agent:{{ .Version }}-amd64"
+      - "ghcr.io/certwatch-app/cw-agent:{{ .Version }}-arm64"
+
+  - name_template: "ghcr.io/certwatch-app/cw-agent:latest"
+    image_templates:
+      - "ghcr.io/certwatch-app/cw-agent:{{ .Version }}-amd64"
+      - "ghcr.io/certwatch-app/cw-agent:{{ .Version }}-arm64"
+
+brews:
+  - repository:
+      owner: certwatch-app
+      name: homebrew-tap
+    folder: Formula
+    homepage: "https://certwatch.app"
+    description: "SSL/TLS certificate monitoring agent for CertWatch"
+    license: "Apache-2.0"
+    install: |
+      bin.install "cw-agent"
+    test: |
+      system "#{bin}/cw-agent", "version"
+
+nfpms:
+  - id: packages
+    package_name: cw-agent
+    vendor: CertWatch
+    homepage: https://certwatch.app
+    maintainer: CertWatch <support@certwatch.app>
+    description: SSL/TLS certificate monitoring agent
+    license: Apache-2.0
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+    contents:
+      - src: certwatch.example.yaml
+        dst: /etc/certwatch/certwatch.example.yaml
+        type: config

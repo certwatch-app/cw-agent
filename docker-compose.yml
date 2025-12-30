@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  cw-agent:
+    build:
+      context: .
+      args:
+        VERSION: ${VERSION:-dev}
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+    image: certwatch-app/cw-agent:${VERSION:-latest}
+    container_name: cw-agent
+    restart: unless-stopped
+    volumes:
+      # Mount config file (required)
+      - ./certwatch.yaml:/etc/certwatch/certwatch.yaml:ro
+    environment:
+      # Environment variables can override config
+      - CW_API_KEY=${CW_API_KEY:-}
+      - CW_AGENT_NAME=${CW_AGENT_NAME:-}
+    # Optional: Add health check
+    # healthcheck:
+    #   test: ["CMD", "/cw-agent", "version"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
