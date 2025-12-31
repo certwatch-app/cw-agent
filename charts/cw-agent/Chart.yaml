@@ -2,7 +2,7 @@ apiVersion: v2
 name: cw-agent
 description: CertWatch Agent - SSL/TLS certificate monitoring for private infrastructure
 type: application
-version: 0.1.2
+version: 0.1.3
 appVersion: "0.4.2"
 keywords:
   - ssl
