@@ -22,11 +22,13 @@ type WizardState struct {
 	APITimeout  string
 
 	// Agent configuration
-	AgentName    string
-	SyncInterval string
-	ScanInterval string
-	LogLevel     string
-	Concurrency  int
+	AgentName         string
+	SyncInterval      string
+	ScanInterval      string
+	LogLevel          string
+	Concurrency       int
+	MetricsPort       string // "8080" default, "0" to disable
+	HeartbeatInterval string // "30s" default, "0" to disable
 
 	// Certificate configuration
 	Certificates []CertificateInput
@@ -45,15 +47,17 @@ type CertificateInput struct {
 // NewWizardState creates a new WizardState with sensible defaults.
 func NewWizardState() *WizardState {
 	return &WizardState{
-		ConfigPath:   "./certwatch.yaml",
-		APIEndpoint:  "https://api.certwatch.app",
-		APITimeout:   "30s",
-		AgentName:    "",
-		SyncInterval: "5m",
-		ScanInterval: "1m",
-		LogLevel:     "info",
-		Concurrency:  10,
-		Certificates: make([]CertificateInput, 0),
+		ConfigPath:        "./certwatch.yaml",
+		APIEndpoint:       "https://api.certwatch.app",
+		APITimeout:        "30s",
+		AgentName:         "",
+		SyncInterval:      "5m",
+		ScanInterval:      "1m",
+		LogLevel:          "info",
+		Concurrency:       10,
+		MetricsPort:       "8080",
+		HeartbeatInterval: "30s",
+		Certificates:      make([]CertificateInput, 0),
 		CurrentCert: CertificateInput{
 			PortStr: "443",
 		},
@@ -78,6 +82,24 @@ func (s *WizardState) ToConfig() (*config.Config, error) {
 	scanInterval, err := time.ParseDuration(s.ScanInterval)
 	if err != nil {
 		return nil, fmt.Errorf("invalid scan interval: %w", err)
+	}
+
+	// Parse heartbeat interval (0 to disable)
+	var heartbeatInterval time.Duration
+	if s.HeartbeatInterval != "" && s.HeartbeatInterval != "0" {
+		heartbeatInterval, err = time.ParseDuration(s.HeartbeatInterval)
+		if err != nil {
+			return nil, fmt.Errorf("invalid heartbeat interval: %w", err)
+		}
+	}
+
+	// Parse metrics port (0 to disable)
+	metricsPort := 8080
+	if s.MetricsPort != "" {
+		p, err := strconv.Atoi(s.MetricsPort)
+		if err == nil {
+			metricsPort = p
+		}
 	}
 
 	// Convert certificates
@@ -108,11 +130,13 @@ func (s *WizardState) ToConfig() (*config.Config, error) {
 			Timeout:  timeout,
 		},
 		Agent: config.AgentConfig{
-			Name:         s.AgentName,
-			LogLevel:     s.LogLevel,
-			SyncInterval: syncInterval,
-			ScanInterval: scanInterval,
-			Concurrency:  s.Concurrency,
+			Name:              s.AgentName,
+			LogLevel:          s.LogLevel,
+			SyncInterval:      syncInterval,
+			ScanInterval:      scanInterval,
+			Concurrency:       s.Concurrency,
+			MetricsPort:       metricsPort,
+			HeartbeatInterval: heartbeatInterval,
 		},
 		Certificates: certs,
 	}

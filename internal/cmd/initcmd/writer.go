@@ -72,6 +72,14 @@ func generateYAML(cfg *config.Config) string {
 	buf.WriteString(fmt.Sprintf("  concurrency: %d\n", cfg.Agent.Concurrency))
 	buf.WriteString("  # Logging level: debug, info, warn, error\n")
 	buf.WriteString(fmt.Sprintf("  log_level: %s\n", cfg.Agent.LogLevel))
+	buf.WriteString("  # Prometheus metrics server port (0 to disable)\n")
+	buf.WriteString(fmt.Sprintf("  metrics_port: %d\n", cfg.Agent.MetricsPort))
+	buf.WriteString("  # Heartbeat interval for downtime alerts (0 to disable)\n")
+	if cfg.Agent.HeartbeatInterval == 0 {
+		buf.WriteString("  heartbeat_interval: 0\n")
+	} else {
+		buf.WriteString(fmt.Sprintf("  heartbeat_interval: %s\n", cfg.Agent.HeartbeatInterval.String()))
+	}
 	buf.WriteString("\n")
 
 	// Certificates section

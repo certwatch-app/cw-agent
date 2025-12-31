@@ -98,6 +98,39 @@ func NewAgentForm(state *WizardState) *huh.Form {
 	).WithTheme(ui.CreateTheme())
 }
 
+// NewAdvancedForm creates the advanced configuration form for observability.
+func NewAdvancedForm(state *WizardState) *huh.Form {
+	return huh.NewForm(
+		huh.NewGroup(
+			huh.NewNote().
+				Title("Observability Settings").
+				Description("Configure metrics and health monitoring (optional)"),
+
+			huh.NewSelect[string]().
+				Title("Metrics Server Port").
+				Description("Port for Prometheus metrics endpoint (/metrics). Set to 0 to disable.").
+				Options(
+					huh.NewOption("8080 (default)", "8080"),
+					huh.NewOption("9090", "9090"),
+					huh.NewOption("3000", "3000"),
+					huh.NewOption("Disabled", "0"),
+				).
+				Value(&state.MetricsPort),
+
+			huh.NewSelect[string]().
+				Title("Heartbeat Interval").
+				Description("How often to send heartbeats for downtime alerts. Set to 0 to disable.").
+				Options(
+					huh.NewOption("30 seconds (recommended)", "30s"),
+					huh.NewOption("1 minute", "1m"),
+					huh.NewOption("5 minutes", "5m"),
+					huh.NewOption("Disabled", "0"),
+				).
+				Value(&state.HeartbeatInterval),
+		),
+	).WithTheme(ui.CreateTheme())
+}
+
 // NewCertificateForm creates a certificate entry form.
 func NewCertificateForm(state *WizardState, certNum int) *huh.Form {
 	return huh.NewForm(

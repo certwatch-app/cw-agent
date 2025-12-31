@@ -71,7 +71,13 @@ func (w *Wizard) Run() error {
 		return w.handleError(err)
 	}
 
-	// Step 5: Certificate configuration (loop)
+	// Step 5: Advanced/Observability configuration
+	fmt.Println(ui.RenderSection("Observability"))
+	if err := w.runAdvancedForm(); err != nil {
+		return w.handleError(err)
+	}
+
+	// Step 6: Certificate configuration (loop)
 	fmt.Println(ui.RenderSection("Certificates to Monitor"))
 	if err := w.runCertificateForms(); err != nil {
 		return w.handleError(err)
@@ -111,6 +117,11 @@ func (w *Wizard) runAPIForm() error {
 
 func (w *Wizard) runAgentForm() error {
 	form := NewAgentForm(w.state)
+	return form.Run()
+}
+
+func (w *Wizard) runAdvancedForm() error {
+	form := NewAdvancedForm(w.state)
 	return form.Run()
 }
 
@@ -196,6 +207,18 @@ func (w *Wizard) showSuccess() {
 	fmt.Println(ui.RenderKeyValue("Certificates", fmt.Sprintf("%d", len(w.state.Certificates))))
 	fmt.Println(ui.RenderKeyValue("Sync", w.state.SyncInterval))
 	fmt.Println(ui.RenderKeyValue("Scan", w.state.ScanInterval))
+
+	// Show observability settings
+	if w.state.MetricsPort != "0" {
+		fmt.Println(ui.RenderKeyValue("Metrics", "http://localhost:"+w.state.MetricsPort+"/metrics"))
+	} else {
+		fmt.Println(ui.RenderKeyValue("Metrics", "disabled"))
+	}
+	if w.state.HeartbeatInterval != "0" {
+		fmt.Println(ui.RenderKeyValue("Heartbeat", w.state.HeartbeatInterval))
+	} else {
+		fmt.Println(ui.RenderKeyValue("Heartbeat", "disabled"))
+	}
 	fmt.Println()
 
 	fmt.Println(ui.TitleStyle.Render("Next steps:"))
@@ -239,6 +262,15 @@ func RunNonInteractive(outputPath string) error {
 
 	if level := os.Getenv("CW_LOG_LEVEL"); level != "" {
 		state.LogLevel = level
+	}
+
+	// Observability settings
+	if port := os.Getenv("CW_METRICS_PORT"); port != "" {
+		state.MetricsPort = port
+	}
+
+	if interval := os.Getenv("CW_HEARTBEAT_INTERVAL"); interval != "" {
+		state.HeartbeatInterval = interval
 	}
 
 	// Parse certificates from CW_CERTIFICATES (comma-separated hostnames)
