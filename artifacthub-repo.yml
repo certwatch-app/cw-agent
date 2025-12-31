@@ -9,7 +9,7 @@
 #    - URL: oci://ghcr.io/certwatch-app/helm-charts
 # 3. ArtifactHub will automatically scan and index the chart
 
-repositoryID: certwatch-app-cw-agent
+repositoryID: 5ee789ae-b964-47af-a12b-15666736035e
 owners:
   - name: certwatch
     email: support@certwatch.app
