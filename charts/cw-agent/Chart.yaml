@@ -17,7 +17,7 @@ sources:
 maintainers:
   - name: CertWatch
     email: support@certwatch.app
-icon: https://certwatch.app/icon.png
+icon: https://certwatch.app/certwatch-logo.png
 annotations:
   artifacthub.io/license: Apache-2.0
   artifacthub.io/links: |
