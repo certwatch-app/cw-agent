@@ -366,6 +366,14 @@ When `heartbeat_interval` is set (default: `30s`), the agent sends periodic hear
 3. Create a new key with the `cloud:sync` scope
 4. Copy the key (it's only shown once!)
 
+## Community
+
+- 💬 [GitHub Discussions](https://github.com/certwatch-app/cw-agent/discussions) - Ask questions, share ideas, get help
+- 🗺️ [Public Roadmap](https://certwatch.app/roadmap) - Vote on features and see what's coming
+- 📖 [Documentation](https://docs.certwatch.app/agent) - Guides and API reference
+- ☸️ [Helm Chart on ArtifactHub](https://artifacthub.io/packages/helm/cw-agent/cw-agent) - Kubernetes deployment
+- 🐛 [Report a Bug](https://github.com/certwatch-app/cw-agent/issues/new) - Found an issue? Let us know
+
 ## Development
 
 ### Building
