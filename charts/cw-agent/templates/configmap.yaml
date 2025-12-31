@@ -1,0 +1,42 @@
+{{- if not .Values.existingConfigMap.name }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cw-agent.fullname" . }}
+  labels:
+    {{- include "cw-agent.labels" . | nindent 4 }}
+data:
+  certwatch.yaml: |
+    api:
+      endpoint: {{ .Values.api.endpoint | quote }}
+      timeout: {{ .Values.api.timeout | quote }}
+      # API key injected via environment variable
+
+    agent:
+      name: {{ required "agent.name is required" .Values.agent.name | quote }}
+      log_level: {{ .Values.agent.logLevel | quote }}
+      sync_interval: {{ .Values.agent.syncInterval | quote }}
+      scan_interval: {{ .Values.agent.scanInterval | quote }}
+      concurrency: {{ .Values.agent.concurrency }}
+      heartbeat_interval: {{ .Values.agent.heartbeatInterval | quote }}
+      metrics_port: {{ .Values.agent.metricsPort }}
+
+    certificates:
+    {{- if .Values.certificates }}
+    {{- range .Values.certificates }}
+      - hostname: {{ .hostname | quote }}
+        port: {{ .port | default 443 }}
+        {{- if .tags }}
+        tags:
+          {{- range .tags }}
+          - {{ . | quote }}
+          {{- end }}
+        {{- end }}
+        {{- if .notes }}
+        notes: {{ .notes | quote }}
+        {{- end }}
+    {{- end }}
+    {{- else }}
+      []
+    {{- end }}
+{{- end }}

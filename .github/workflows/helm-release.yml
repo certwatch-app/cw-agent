@@ -1,0 +1,55 @@
+name: Helm Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  CHART_PATH: charts/cw-agent
+
+jobs:
+  release:
+    name: Release Helm Chart
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.14.0'
+
+      - name: Login to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ${{ env.REGISTRY }} \
+            --username ${{ github.actor }} \
+            --password-stdin
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update Chart.yaml version
+        run: |
+          sed -i "s/^version:.*/version: ${{ steps.version.outputs.version }}/" ${{ env.CHART_PATH }}/Chart.yaml
+          sed -i "s/^appVersion:.*/appVersion: \"${{ steps.version.outputs.version }}\"/" ${{ env.CHART_PATH }}/Chart.yaml
+
+      - name: Lint chart
+        run: helm lint ${{ env.CHART_PATH }}
+
+      - name: Package chart
+        run: helm package ${{ env.CHART_PATH }}
+
+      - name: Push to GHCR
+        run: |
+          helm push cw-agent-${{ steps.version.outputs.version }}.tgz \
+            oci://${{ env.REGISTRY }}/certwatch-app/helm-charts

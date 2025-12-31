@@ -1,0 +1,48 @@
+CertWatch Agent has been deployed!
+
+{{- if not .Values.agent.name }}
+
+WARNING: agent.name is not set. The agent will fail to start.
+   Set it via: --set agent.name=my-agent-name
+
+{{- end }}
+
+{{- if .Values.apiKey.value }}
+
+NOTE: API key was provided directly via apiKey.value.
+   This is stored in Helm release history.
+   For production, use apiKey.existingSecret instead.
+
+{{- else if .Values.apiKey.existingSecret.name }}
+
+API Key Secret: {{ .Values.apiKey.existingSecret.name }}
+   Key: {{ .Values.apiKey.existingSecret.key | default "api-key" }}
+
+{{- else }}
+
+WARNING: No API key configured! The agent will fail to authenticate.
+   Option 1 (testing):    --set apiKey.value=cw_xxx
+   Option 2 (production): --set apiKey.existingSecret.name=my-secret
+
+{{- end }}
+
+To verify the deployment:
+  kubectl get pods -l app.kubernetes.io/name={{ include "cw-agent.name" . }}
+
+To view logs:
+  kubectl logs -l app.kubernetes.io/name={{ include "cw-agent.name" . }} -f
+
+{{- if gt (int .Values.agent.metricsPort) 0 }}
+
+Prometheus metrics are available at:
+  http://{{ include "cw-agent.fullname" . }}:{{ .Values.service.port }}/metrics
+
+Health endpoints:
+  /healthz - Basic liveness
+  /readyz  - Readiness probe
+  /livez   - Deep liveness check
+
+{{- end }}
+
+For more information:
+  https://docs.certwatch.app/agent

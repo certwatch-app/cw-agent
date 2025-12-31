@@ -1,0 +1,27 @@
+apiVersion: v2
+name: cw-agent
+description: CertWatch Agent - SSL/TLS certificate monitoring for private infrastructure
+type: application
+version: 0.1.0
+appVersion: "0.4.0"
+keywords:
+  - ssl
+  - tls
+  - certificate
+  - monitoring
+  - security
+  - certwatch
+home: https://certwatch.app
+sources:
+  - https://github.com/certwatch-app/cw-agent
+maintainers:
+  - name: CertWatch
+    email: support@certwatch.app
+icon: https://certwatch.app/icon.png
+annotations:
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/links: |
+    - name: Documentation
+      url: https://docs.certwatch.app/agent
+    - name: Support
+      url: https://github.com/certwatch-app/cw-agent/issues

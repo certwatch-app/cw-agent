@@ -1,0 +1,15 @@
+# ArtifactHub Repository Metadata
+# https://artifacthub.io/docs/topics/repositories/#helm-charts-repositories
+#
+# After the first release, register this repository on ArtifactHub:
+# 1. Go to https://artifacthub.io/control-panel/repositories
+# 2. Add repository:
+#    - Kind: Helm charts
+#    - Name: cw-agent
+#    - URL: oci://ghcr.io/certwatch-app/helm-charts
+# 3. ArtifactHub will automatically scan and index the chart
+
+repositoryID: certwatch-app-cw-agent
+owners:
+  - name: certwatch
+    email: support@certwatch.app
