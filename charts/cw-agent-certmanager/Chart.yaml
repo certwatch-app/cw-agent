@@ -1,6 +1,6 @@
 apiVersion: v2
-name: cw-agent
-description: CertWatch Agent - SSL/TLS certificate monitoring for private infrastructure
+name: cw-agent-certmanager
+description: CertWatch Agent for cert-manager - Monitors Kubernetes certificates managed by cert-manager
 type: application
 version: 0.5.0
 appVersion: "0.5.0"
@@ -9,7 +9,9 @@ keywords:
   - tls
   - certificate
   - monitoring
-  - security
+  - kubernetes
+  - cert-manager
+  - controller
   - certwatch
 home: https://certwatch.app
 sources:
@@ -22,6 +24,6 @@ annotations:
   artifacthub.io/license: Apache-2.0
   artifacthub.io/links: |
     - name: Documentation
-      url: https://docs.certwatch.app/agent
+      url: https://docs.certwatch.app/agent-certmanager
     - name: Support
       url: https://github.com/certwatch-app/cw-agent/issues

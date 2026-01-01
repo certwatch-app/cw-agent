@@ -1,0 +1,58 @@
+CertWatch cert-manager Agent has been deployed!
+
+{{- if not .Values.agent.name }}
+
+WARNING: agent.name is not set. The agent will fail to start.
+   Set it via: --set agent.name=my-cluster-name
+
+{{- end }}
+
+{{- $secretName := include "cw-agent-certmanager.apiKeySecretName" . }}
+{{- if not $secretName }}
+
+WARNING: No API key configured! The agent will fail to authenticate.
+   Option 1 (testing):    --set apiKey.value=cw_xxx
+   Option 2 (production): --set apiKey.existingSecret.name=my-secret
+   Option 3 (umbrella):   --set global.apiKey.value=cw_xxx
+
+{{- else }}
+
+API Key Secret: {{ $secretName }}
+
+{{- end }}
+
+To verify the deployment:
+  kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/name={{ include "cw-agent-certmanager.name" . }}
+
+To view logs:
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name={{ include "cw-agent-certmanager.name" . }} -f
+
+{{- if gt (int .Values.agent.metricsPort) 0 }}
+
+Prometheus metrics are available at:
+  http://{{ include "cw-agent-certmanager.fullname" . }}:{{ .Values.service.port }}/metrics
+
+Health endpoints (port {{ .Values.agent.healthPort }}):
+  /healthz - Basic liveness
+  /readyz  - Readiness probe
+
+{{- end }}
+
+{{- if .Values.agent.watchAllNamespaces }}
+
+Watching: All namespaces
+{{- else }}
+{{- if .Values.agent.namespaces }}
+
+Watching namespaces:
+{{- range .Values.agent.namespaces }}
+  - {{ . }}
+{{- end }}
+{{- else }}
+
+WARNING: watchAllNamespaces is false but no namespaces specified.
+{{- end }}
+{{- end }}
+
+For more information:
+  https://docs.certwatch.app/agent-certmanager

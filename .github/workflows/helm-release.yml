@@ -11,11 +11,11 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  CHART_PATH: charts/cw-agent
+  REGISTRY_PATH: ghcr.io/certwatch-app/helm-charts
 
 jobs:
   release:
-    name: Release Helm Chart
+    name: Release Helm Charts
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -38,18 +38,87 @@ jobs:
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Update Chart.yaml version
+      - name: Create packages directory
+        run: mkdir -p .helm-packages
+
+      # ============================================================
+      # Release cw-agent chart
+      # ============================================================
+      - name: Update cw-agent Chart.yaml
         run: |
-          sed -i "s/^version:.*/version: ${{ steps.version.outputs.version }}/" ${{ env.CHART_PATH }}/Chart.yaml
-          sed -i "s/^appVersion:.*/appVersion: \"${{ steps.version.outputs.version }}\"/" ${{ env.CHART_PATH }}/Chart.yaml
+          sed -i "s/^version:.*/version: ${{ steps.version.outputs.version }}/" charts/cw-agent/Chart.yaml
+          sed -i "s/^appVersion:.*/appVersion: \"${{ steps.version.outputs.version }}\"/" charts/cw-agent/Chart.yaml
 
-      - name: Lint chart
-        run: helm lint ${{ env.CHART_PATH }}
+      - name: Lint cw-agent
+        run: helm lint charts/cw-agent
 
-      - name: Package chart
-        run: helm package ${{ env.CHART_PATH }}
+      - name: Package cw-agent
+        run: helm package charts/cw-agent -d .helm-packages
 
-      - name: Push to GHCR
+      - name: Push cw-agent to GHCR
         run: |
-          helm push cw-agent-${{ steps.version.outputs.version }}.tgz \
-            oci://${{ env.REGISTRY }}/certwatch-app/helm-charts
+          helm push .helm-packages/cw-agent-${{ steps.version.outputs.version }}.tgz \
+            oci://${{ env.REGISTRY_PATH }}
+
+      # ============================================================
+      # Release cw-agent-certmanager chart
+      # ============================================================
+      - name: Update cw-agent-certmanager Chart.yaml
+        run: |
+          sed -i "s/^version:.*/version: ${{ steps.version.outputs.version }}/" charts/cw-agent-certmanager/Chart.yaml
+          sed -i "s/^appVersion:.*/appVersion: \"${{ steps.version.outputs.version }}\"/" charts/cw-agent-certmanager/Chart.yaml
+
+      - name: Lint cw-agent-certmanager
+        run: helm lint charts/cw-agent-certmanager
+
+      - name: Package cw-agent-certmanager
+        run: helm package charts/cw-agent-certmanager -d .helm-packages
+
+      - name: Push cw-agent-certmanager to GHCR
+        run: |
+          helm push .helm-packages/cw-agent-certmanager-${{ steps.version.outputs.version }}.tgz \
+            oci://${{ env.REGISTRY_PATH }}
+
+      # ============================================================
+      # Release cw-stack umbrella chart
+      # ============================================================
+      - name: Update cw-stack Chart.yaml
+        run: |
+          # Update chart version and appVersion
+          sed -i "s/^version:.*/version: ${{ steps.version.outputs.version }}/" charts/cw-stack/Chart.yaml
+          sed -i "s/^appVersion:.*/appVersion: \"${{ steps.version.outputs.version }}\"/" charts/cw-stack/Chart.yaml
+          # Update dependency versions to match
+          sed -i "s/version: \"0\.[0-9]*\.x\"/version: \"${{ steps.version.outputs.version }}\"/" charts/cw-stack/Chart.yaml
+
+      - name: Update cw-stack dependencies
+        run: |
+          cd charts/cw-stack
+          helm dependency update
+
+      - name: Lint cw-stack
+        run: helm lint charts/cw-stack
+
+      - name: Package cw-stack
+        run: helm package charts/cw-stack -d .helm-packages
+
+      - name: Push cw-stack to GHCR
+        run: |
+          helm push .helm-packages/cw-stack-${{ steps.version.outputs.version }}.tgz \
+            oci://${{ env.REGISTRY_PATH }}
+
+      # ============================================================
+      # Summary
+      # ============================================================
+      - name: Release Summary
+        run: |
+          echo "## Helm Charts Released" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Version: **${{ steps.version.outputs.version }}**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Charts Published to OCI Registry" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Chart | Install Command |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-----------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| cw-agent | \`helm install cw-agent oci://${{ env.REGISTRY_PATH }}/cw-agent --version ${{ steps.version.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| cw-agent-certmanager | \`helm install cw-agent-certmanager oci://${{ env.REGISTRY_PATH }}/cw-agent-certmanager --version ${{ steps.version.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| cw-stack | \`helm install certwatch oci://${{ env.REGISTRY_PATH }}/cw-stack --version ${{ steps.version.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY

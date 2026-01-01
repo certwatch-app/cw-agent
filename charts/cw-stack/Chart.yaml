@@ -1,0 +1,44 @@
+apiVersion: v2
+name: cw-stack
+description: |
+  CertWatch Stack - Umbrella chart for deploying CertWatch agents.
+  Includes optional network scanner (cw-agent) and cert-manager controller (cw-agent-certmanager).
+
+type: application
+
+# Chart version - synced with app version 
+version: 0.5.0
+
+# Application version - matches the bundled agent versions
+appVersion: "0.5.0"
+
+home: https://certwatch.app
+sources:
+  - https://github.com/certwatch-app/certwatch
+
+maintainers:
+  - name: CertWatch Team
+    email: support@certwatch.app
+
+keywords:
+  - certificate
+  - ssl
+  - tls
+  - monitoring
+  - security
+  - cert-manager
+  - kubernetes
+
+# Subchart dependencies with enable conditions
+dependencies:
+  - name: cw-agent
+    version: "0.5.x"
+    repository: "file://../cw-agent"
+    condition: agent.enabled
+    alias: cw-agent
+
+  - name: cw-agent-certmanager
+    version: "0.5.x"
+    repository: "file://../cw-agent-certmanager"
+    condition: certManager.enabled
+    alias: cw-agent-certmanager

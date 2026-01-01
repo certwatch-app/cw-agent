@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cw-agent-certmanager.fullname" . }}
+  labels:
+    {{- include "cw-agent-certmanager.labels" . | nindent 4 }}
+data:
+  certwatch.yaml: |
+    api:
+      endpoint: {{ include "cw-agent-certmanager.apiEndpoint" . | quote }}
+      timeout: {{ include "cw-agent-certmanager.apiTimeout" . | quote }}
+      # API key injected via environment variable
+
+    agent:
+      name: {{ required "agent.name is required" .Values.agent.name | quote }}
+      {{- if .Values.agent.clusterName }}
+      cluster_name: {{ .Values.agent.clusterName | quote }}
+      {{- end }}
+      log_level: {{ .Values.agent.logLevel | quote }}
+      metrics_port: {{ .Values.agent.metricsPort }}
+      sync_interval: {{ .Values.agent.syncInterval | quote }}
+      heartbeat_interval: {{ .Values.agent.heartbeatInterval | quote }}
+      watch_all_namespaces: {{ .Values.agent.watchAllNamespaces }}
+      {{- if not .Values.agent.watchAllNamespaces }}
+      {{- if .Values.agent.namespaces }}
+      namespaces:
+        {{- range .Values.agent.namespaces }}
+        - {{ . | quote }}
+        {{- end }}
+      {{- end }}
+      {{- end }}

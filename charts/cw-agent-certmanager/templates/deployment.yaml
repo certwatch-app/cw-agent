@@ -1,15 +1,15 @@
-{{- include "cw-agent.validateApiKey" . }}
+{{- include "cw-agent-certmanager.validateApiKey" . -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "cw-agent.fullname" . }}
+  name: {{ include "cw-agent-certmanager.fullname" . }}
   labels:
-    {{- include "cw-agent.labels" . | nindent 4 }}
+    {{- include "cw-agent-certmanager.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "cw-agent.selectorLabels" . | nindent 6 }}
+      {{- include "cw-agent-certmanager.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       annotations:
@@ -18,13 +18,20 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       labels:
-        {{- include "cw-agent.selectorLabels" . | nindent 8 }}
+        {{- include "cw-agent-certmanager.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "cw-agent.serviceAccountName" . }}
+      {{- if .Values.global }}
+        {{- if .Values.global.image }}
+          {{- with .Values.global.image.pullSecrets }}
+        {{- toYaml . | nindent 8 }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      serviceAccountName: {{ include "cw-agent-certmanager.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -34,27 +41,25 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
-            - start
-            - -c
-            - /etc/certwatch/certwatch.yaml
+            - "-c"
+            - "/etc/certwatch/certwatch.yaml"
           env:
             - name: CW_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "cw-agent.apiKeySecretName" . }}
-                  key: {{ include "cw-agent.apiKeySecretKey" . }}
+                  name: {{ include "cw-agent-certmanager.apiKeySecretName" . }}
+                  key: {{ include "cw-agent-certmanager.apiKeySecretKey" . }}
           ports:
-            {{- if gt (int .Values.agent.metricsPort) 0 }}
             - name: metrics
               containerPort: {{ .Values.agent.metricsPort }}
               protocol: TCP
-            {{- end }}
-          {{- if gt (int .Values.agent.metricsPort) 0 }}
+            - name: health
+              containerPort: {{ .Values.agent.healthPort }}
+              protocol: TCP
           livenessProbe:
             {{- toYaml .Values.livenessProbe | nindent 12 }}
           readinessProbe:
             {{- toYaml .Values.readinessProbe | nindent 12 }}
-          {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
@@ -62,18 +67,11 @@ spec:
               mountPath: /etc/certwatch
               readOnly: true
             - name: state
-              mountPath: /etc/certwatch-state
+              mountPath: /var/lib/certwatch
       volumes:
         - name: config
           configMap:
-            {{- if .Values.existingConfigMap.name }}
-            name: {{ .Values.existingConfigMap.name }}
-            items:
-              - key: {{ .Values.existingConfigMap.key }}
-                path: certwatch.yaml
-            {{- else }}
-            name: {{ include "cw-agent.fullname" . }}
-            {{- end }}
+            name: {{ include "cw-agent-certmanager.fullname" . }}
         - name: state
           emptyDir: {}
       {{- with .Values.nodeSelector }}

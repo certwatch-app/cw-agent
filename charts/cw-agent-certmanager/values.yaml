@@ -1,10 +1,10 @@
-# Default values for cw-agent
+# Default values for cw-agent-certmanager
 # This is a YAML-formatted file.
 
 replicaCount: 1
 
 image:
-  repository: ghcr.io/certwatch-app/cw-agent
+  repository: ghcr.io/certwatch-app/cw-agent-certmanager
   pullPolicy: IfNotPresent
   # Overrides the image tag (defaults to appVersion)
   tag: ""
@@ -17,7 +17,7 @@ fullnameOverride: ""
 # CertWatch API Configuration
 # ============================================================
 api:
-  # CertWatch API endpoint
+  # CertWatch API endpoint (can be overridden by global.api.endpoint)
   endpoint: "https://api.certwatch.app"
   # Request timeout
   timeout: "30s"
@@ -28,24 +28,23 @@ api:
 # Choose ONE of the following options:
 #
 # OPTION 1: Direct value (convenient for testing)
-#   helm install cw-agent ... --set apiKey.value=cw_xxx
+#   helm install ... --set apiKey.value=cw_xxx
 #   WARNING: The key will be stored in Helm release history.
-#   Use existingSecret for production deployments.
 #
 # OPTION 2: Existing secret (recommended for production)
-#   kubectl create secret generic cw-agent-api-key --from-literal=api-key=cw_xxx
-#   helm install cw-agent ... --set apiKey.existingSecret.name=cw-agent-api-key
+#   kubectl create secret generic cw-api-key --from-literal=api-key=cw_xxx
+#   helm install ... --set apiKey.existingSecret.name=cw-api-key
+#
+# OPTION 3: Use global API key from umbrella chart
+#   Automatically used if neither value nor existingSecret is set
 #
 apiKey:
-  # Option 1: Provide API key directly (Helm will create a Secret)
-  # WARNING: Not recommended for production - visible in Helm history
+  # Option 1: Provide API key directly
   value: ""
 
-  # Option 2: Use an existing Kubernetes Secret (recommended)
+  # Option 2: Use an existing Kubernetes Secret
   existingSecret:
-    # Name of the existing secret containing the API key
     name: ""
-    # Key within the secret that contains the API key
     key: "api-key"
 
 # ============================================================
@@ -54,40 +53,24 @@ apiKey:
 agent:
   # Unique name for this agent (required)
   name: ""
+  # Optional cluster name (defaults to agent.name if not set)
+  clusterName: ""
   # Log level: debug, info, warn, error
   logLevel: "info"
-  # How often to sync with CertWatch cloud
-  syncInterval: "5m"
-  # How often to scan certificates locally
-  scanInterval: "1m"
-  # Maximum concurrent certificate scans
-  concurrency: 10
-  # Heartbeat interval for offline alerts (0 to disable)
+  # Prometheus metrics port
+  metricsPort: 9402
+  # Health check port (liveness/readiness)
+  healthPort: 9403
+  # How often to sync certificate data to CertWatch cloud
+  syncInterval: "30s"
+  # Heartbeat interval for offline detection
   heartbeatInterval: "30s"
-  # Prometheus metrics port (0 to disable)
-  metricsPort: 8080
-
-# ============================================================
-# Certificates to Monitor
-# ============================================================
-# Option 1: Inline certificates (simple)
-certificates: []
-  # - hostname: "api.example.com"
-  #   port: 443
-  #   tags:
-  #     - production
-  #     - api
-  #   notes: "Main API endpoint"
-  # - hostname: "www.example.com"
-  #   port: 443
-
-# Option 2: External ConfigMap (for managed deployments)
-# Reference an existing ConfigMap containing certwatch.yaml
-existingConfigMap:
-  # Name of existing ConfigMap
-  name: ""
-  # Key containing the certwatch.yaml content
-  key: "certwatch.yaml"
+  # Watch certificates in all namespaces
+  watchAllNamespaces: true
+  # If watchAllNamespaces is false, specify namespaces to watch
+  namespaces: []
+    # - default
+    # - production
 
 # ============================================================
 # Kubernetes Resources
@@ -97,9 +80,13 @@ serviceAccount:
   create: true
   # Annotations to add to the service account
   annotations: {}
-  # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template
+  # The name of the service account to use
   name: ""
+
+# RBAC configuration
+rbac:
+  # Create ClusterRole and ClusterRoleBinding
+  create: true
 
 podAnnotations: {}
 
@@ -117,58 +104,52 @@ securityContext:
 
 service:
   type: ClusterIP
-  port: 8080
+  port: 9402
 
 resources:
   limits:
-    cpu: 100m
+    cpu: 200m
     memory: 128Mi
   requests:
-    cpu: 10m
-    memory: 32Mi
+    cpu: 50m
+    memory: 64Mi
 
 # ============================================================
 # Probes
 # ============================================================
 livenessProbe:
   httpGet:
-    path: /livez
-    port: metrics
-  initialDelaySeconds: 30
-  periodSeconds: 10
+    path: /healthz
+    port: health
+  initialDelaySeconds: 15
+  periodSeconds: 20
   failureThreshold: 3
 
 readinessProbe:
   httpGet:
     path: /readyz
-    port: metrics
+    port: health
   initialDelaySeconds: 5
-  periodSeconds: 5
+  periodSeconds: 10
   failureThreshold: 3
-
-# ============================================================
-# Prometheus ServiceMonitor (requires Prometheus Operator)
-# ============================================================
-serviceMonitor:
-  # Create a ServiceMonitor resource for Prometheus Operator
-  enabled: false
-  # Namespace for ServiceMonitor (defaults to release namespace)
-  namespace: ""
-  # Scrape interval
-  interval: "30s"
-  # Additional labels for ServiceMonitor
-  labels: {}
 
 # ============================================================
 # Pod Disruption Budget
 # ============================================================
 podDisruptionBudget:
-  # Create a PodDisruptionBudget
   enabled: false
-  # Minimum available pods (number or percentage like "50%")
   # minAvailable: 1
-  # Maximum unavailable pods (number or percentage)
-  # maxUnavailable: 1
+  # maxUnavailable: 0
+
+# ============================================================
+# Prometheus ServiceMonitor (requires Prometheus Operator)
+# ============================================================
+serviceMonitor:
+  enabled: false
+  namespace: ""
+  interval: "30s"
+  labels: {}
+  namespaceSelector: {}
 
 # ============================================================
 # Scheduling

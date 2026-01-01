@@ -1,0 +1,75 @@
+CertWatch Stack has been deployed!
+
+{{- $agentEnabled := .Values.agent.enabled }}
+{{- $certManagerEnabled := .Values.certManager.enabled }}
+
+{{- if not (or $agentEnabled $certManagerEnabled) }}
+
+WARNING: No agents are enabled! Enable at least one:
+  --set agent.enabled=true           # Network scanner
+  --set certManager.enabled=true     # cert-manager controller
+
+{{- else }}
+
+Enabled Agents:
+{{- if $agentEnabled }}
+  - cw-agent (Network Scanner)
+    {{- if index .Values "cw-agent" "agent" "name" }}
+    Name: {{ index .Values "cw-agent" "agent" "name" }}
+    {{- else }}
+    WARNING: cw-agent.agent.name is not set!
+    {{- end }}
+{{- end }}
+{{- if $certManagerEnabled }}
+  - cw-agent-certmanager (cert-manager Controller)
+    {{- if index .Values "cw-agent-certmanager" "agent" "name" }}
+    Name: {{ index .Values "cw-agent-certmanager" "agent" "name" }}
+    {{- else }}
+    WARNING: cw-agent-certmanager.agent.name is not set!
+    {{- end }}
+{{- end }}
+
+{{- end }}
+
+{{- $hasGlobalKey := false }}
+{{- $hasGlobalSecret := false }}
+{{- if .Values.global }}
+  {{- if .Values.global.apiKey }}
+    {{- if .Values.global.apiKey.value }}
+      {{- $hasGlobalKey = true }}
+    {{- end }}
+    {{- if .Values.global.apiKey.existingSecret }}
+      {{- if .Values.global.apiKey.existingSecret.name }}
+        {{- $hasGlobalSecret = true }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
+{{- if not (or $hasGlobalKey $hasGlobalSecret) }}
+
+WARNING: No global API key configured!
+  Option 1 (testing):    --set global.apiKey.value=cw_xxx
+  Option 2 (production): --set global.apiKey.existingSecret.name=my-secret
+
+  Note: Each agent can also use its own apiKey configuration.
+
+{{- else }}
+
+API Key: {{ if $hasGlobalSecret }}Using existing secret{{ else }}Configured{{ end }}
+
+{{- end }}
+
+To verify the deployment:
+  kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/part-of=certwatch
+
+To view logs:
+{{- if $agentEnabled }}
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name=cw-agent -f
+{{- end }}
+{{- if $certManagerEnabled }}
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name=cw-agent-certmanager -f
+{{- end }}
+
+For more information:
+  https://docs.certwatch.app
