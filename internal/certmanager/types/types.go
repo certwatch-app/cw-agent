@@ -47,3 +47,66 @@ type CertManagerSyncPayload struct {
 	ClusterName  string              `json:"cluster_name"`
 	Certificates []CertificateStatus `json:"certificates"`
 }
+
+// ============================================================================
+// Phase 2: CertificateRequest and Event Types
+// ============================================================================
+
+// FailureCategory constants for categorizing cert-manager failures
+const (
+	FailureCategoryIssuer     = "issuer"
+	FailureCategoryACME       = "acme"
+	FailureCategoryValidation = "validation"
+	FailureCategoryPolicy     = "policy"
+	FailureCategoryUnknown    = "unknown"
+)
+
+// CertificateRequestStatus holds status of a CertificateRequest
+type CertificateRequestStatus struct {
+	// Identity
+	Namespace       string `json:"namespace"`
+	Name            string `json:"name"`
+	CertificateName string `json:"certificate_name"` // Owner reference
+
+	// Status conditions
+	Approved bool `json:"approved"`
+	Denied   bool `json:"denied"`
+	Ready    bool `json:"ready"`
+	Failed   bool `json:"failed"`
+
+	// Failure details
+	FailureReason   string     `json:"failure_reason,omitempty"`
+	FailureMessage  string     `json:"failure_message,omitempty"`
+	FailureTime     *time.Time `json:"failure_time,omitempty"`
+	FailureCategory string     `json:"failure_category,omitempty"` // issuer, acme, validation, policy
+
+	// Timing
+	CreatedAt time.Time     `json:"created_at"`
+	IssuedAt  *time.Time    `json:"issued_at,omitempty"`
+	Duration  time.Duration `json:"duration_ms,omitempty"` // Time to issue
+}
+
+// CertManagerEvent represents a cert-manager related Kubernetes Event
+type CertManagerEvent struct {
+	// Source certificate
+	CertificateNamespace string `json:"certificate_namespace"`
+	CertificateName      string `json:"certificate_name"`
+
+	// Event details
+	Reason    string    `json:"reason"` // Issuing, Failed, OrderFailed, etc.
+	Message   string    `json:"message"`
+	Type      string    `json:"event_type"` // Normal, Warning
+	Timestamp time.Time `json:"timestamp"`
+
+	// Derived failure info
+	IsFailure       bool   `json:"is_failure"`
+	FailureCategory string `json:"failure_category,omitempty"` // issuer, acme, validation, policy
+}
+
+// CertManagerEventSyncPayload is the request body for syncing cert-manager events
+type CertManagerEventSyncPayload struct {
+	AgentID     string             `json:"agent_id,omitempty"`
+	AgentName   string             `json:"agent_name"`
+	ClusterName string             `json:"cluster_name"`
+	Events      []CertManagerEvent `json:"events"`
+}

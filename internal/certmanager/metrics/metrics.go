@@ -8,18 +8,29 @@ import (
 func init() {
 	// Register all metrics with controller-runtime's registry
 	ctrlmetrics.Registry.MustRegister(
+		// Certificate metrics
 		CertificateReady,
 		CertificateIssuing,
 		CertificateExpirySeconds,
 		CertificateDaysUntilExpiry,
 		CertificateFailedAttempts,
+		// Controller metrics
 		ReconcileTotal,
 		ReconcileDuration,
+		// Sync metrics
 		SyncTotal,
 		SyncDuration,
 		HeartbeatTotal,
+		// Agent metrics
 		AgentInfo,
 		CertificatesWatched,
+		// Phase 2: CertificateRequest metrics
+		RequestTotal,
+		RequestDuration,
+		// Phase 2: Event metrics
+		EventTotal,
+		EventSyncTotal,
+		RequestSyncTotal,
 	)
 }
 
@@ -129,4 +140,53 @@ var (
 		Name:      "certificates_watched",
 		Help:      "Number of certificates being watched",
 	})
+
+	// =========================================================================
+	// Phase 2: CertificateRequest metrics
+	// =========================================================================
+
+	// RequestTotal counts CertificateRequest operations by status
+	RequestTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "certwatch",
+		Subsystem: "certmanager",
+		Name:      "request_total",
+		Help:      "Total CertificateRequests by status",
+	}, []string{"namespace", "status"}) // status: pending, approved, denied, failed, ready
+
+	// RequestDuration tracks time to issue a certificate
+	RequestDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "certwatch",
+		Subsystem: "certmanager",
+		Name:      "request_duration_seconds",
+		Help:      "Time to issue certificate in seconds",
+		Buckets:   []float64{1, 5, 10, 30, 60, 120, 300, 600, 1800, 3600},
+	}, []string{"namespace", "issuer_kind"})
+
+	// =========================================================================
+	// Phase 2: Event metrics
+	// =========================================================================
+
+	// EventTotal counts cert-manager events by type
+	EventTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "certwatch",
+		Subsystem: "certmanager",
+		Name:      "event_total",
+		Help:      "Total cert-manager events by reason and type",
+	}, []string{"reason", "type", "failure_category"})
+
+	// EventSyncTotal counts event sync operations
+	EventSyncTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "certwatch",
+		Subsystem: "certmanager",
+		Name:      "event_sync_total",
+		Help:      "Total event sync operations",
+	}, []string{"status"})
+
+	// RequestSyncTotal counts CertificateRequest sync operations
+	RequestSyncTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "certwatch",
+		Subsystem: "certmanager",
+		Name:      "request_sync_total",
+		Help:      "Total CertificateRequest sync operations",
+	}, []string{"status"})
 )

@@ -3,6 +3,7 @@ package certmanager
 import (
 	"context"
 	"fmt"
+	gosync "sync"
 	"time"
 
 	cmapi "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
@@ -39,7 +40,16 @@ type Agent struct {
 	logger       *zap.Logger
 	syncClient   *sync.Client
 	stateManager *state.Manager
-	reconciler   *controller.CertificateReconciler
+
+	// Reconcilers
+	reconciler        *controller.CertificateReconciler
+	requestReconciler *controller.CertificateRequestReconciler
+	eventWatcher      *controller.EventWatcher
+
+	// Debounce immediate event sync to prevent rapid-fire API calls
+	immediateSyncMu       gosync.Mutex
+	immediateSyncPending  bool
+	immediateSyncDebounce time.Duration
 }
 
 // New creates a new cert-manager agent
@@ -59,10 +69,11 @@ func New(cfg *config.Config, stateManager *state.Manager) (*Agent, error) {
 	syncClient := sync.NewWithConfig(syncCfg, cfg.Agent.Name, logger, stateManager)
 
 	return &Agent{
-		config:       cfg,
-		logger:       logger,
-		syncClient:   syncClient,
-		stateManager: stateManager,
+		config:                cfg,
+		logger:                logger,
+		syncClient:            syncClient,
+		stateManager:          stateManager,
+		immediateSyncDebounce: 2 * time.Second, // Wait 2s for events to batch up
 	}, nil
 }
 
@@ -100,7 +111,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to add readyz check: %w", err)
 	}
 
-	// Create and register reconciler
+	// Create and register Certificate reconciler
 	a.reconciler = controller.NewCertificateReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
@@ -108,6 +119,44 @@ func (a *Agent) Run(ctx context.Context) error {
 	)
 	if err := a.reconciler.SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("failed to setup certificate reconciler: %w", err)
+	}
+
+	// Create and register CertificateRequest reconciler (Phase 2)
+	a.requestReconciler = controller.NewCertificateRequestReconciler(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		a.logger,
+	)
+	a.requestReconciler.OnFailure = func(req types.CertificateRequestStatus) {
+		a.logger.Info("certificate request failure detected, triggering immediate event sync",
+			zap.String("namespace", req.Namespace),
+			zap.String("name", req.Name),
+			zap.String("certificate", req.CertificateName),
+			zap.String("category", req.FailureCategory),
+		)
+		go a.doEventSync(ctx)
+	}
+	if err := a.requestReconciler.SetupWithManager(mgr); err != nil {
+		return fmt.Errorf("failed to setup certificaterequest reconciler: %w", err)
+	}
+
+	// Create and register Event watcher (Phase 2)
+	a.eventWatcher = controller.NewEventWatcher(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		a.logger,
+	)
+	a.eventWatcher.OnFailureEvent = func(event types.CertManagerEvent) {
+		a.logger.Info("cert-manager failure event detected, scheduling immediate event sync",
+			zap.String("namespace", event.CertificateNamespace),
+			zap.String("certificate", event.CertificateName),
+			zap.String("reason", event.Reason),
+			zap.String("category", event.FailureCategory),
+		)
+		go a.scheduleImmediateEventSync(ctx)
+	}
+	if err := a.eventWatcher.SetupWithManager(mgr); err != nil {
+		return fmt.Errorf("failed to setup event watcher: %w", err)
 	}
 
 	// Start sync loop in background
@@ -138,6 +187,7 @@ func (a *Agent) syncLoop(ctx context.Context) {
 	// Initial sync after short delay for controller to populate
 	time.Sleep(10 * time.Second)
 	a.doSync(ctx)
+	a.doRequestSync(ctx) // Also sync CertificateRequests
 
 	for {
 		select {
@@ -146,6 +196,7 @@ func (a *Agent) syncLoop(ctx context.Context) {
 			return
 		case <-ticker.C:
 			a.doSync(ctx)
+			a.doRequestSync(ctx) // Also sync CertificateRequests
 		}
 	}
 }
@@ -211,6 +262,161 @@ func (a *Agent) doHeartbeat(ctx context.Context) {
 
 	a.logger.Debug("heartbeat sent", zap.Int("certificate_count", certCount))
 	metrics.HeartbeatTotal.WithLabelValues("success").Inc()
+}
+
+// scheduleImmediateEventSync schedules an event sync with debouncing.
+// Multiple rapid failure events will consolidate into a single sync after the debounce period.
+func (a *Agent) scheduleImmediateEventSync(ctx context.Context) {
+	a.immediateSyncMu.Lock()
+	if a.immediateSyncPending {
+		// Already have a pending sync scheduled, this event will be included
+		a.immediateSyncMu.Unlock()
+		a.logger.Debug("immediate event sync already scheduled, skipping duplicate")
+		return
+	}
+	a.immediateSyncPending = true
+	a.immediateSyncMu.Unlock()
+
+	// Wait for debounce period to allow events to batch up
+	time.Sleep(a.immediateSyncDebounce)
+
+	a.immediateSyncMu.Lock()
+	a.immediateSyncPending = false
+	a.immediateSyncMu.Unlock()
+
+	// Now sync all recent events (uses GetRecentEvents which doesn't clear buffer)
+	a.doImmediateEventSync(ctx)
+}
+
+// doImmediateEventSync syncs recent events without clearing the buffer.
+// This is used for immediate sync on failure events.
+func (a *Agent) doImmediateEventSync(ctx context.Context) {
+	start := time.Now()
+
+	// Get recent events (last 5 minutes) without clearing the buffer
+	// The periodic sync will clear them later
+	events := a.eventWatcher.GetRecentEvents(5 * time.Minute)
+	if len(events) == 0 {
+		a.logger.Debug("no recent events to sync")
+		return
+	}
+
+	// Convert to sync format
+	syncEvents := make([]sync.CertManagerEvent, 0, len(events))
+	for i := range events {
+		syncEvents = append(syncEvents, convertToSyncEvent(&events[i]))
+	}
+
+	// Sync events to API (database deduplication handles duplicates)
+	err := a.syncClient.SyncCertManagerEvents(ctx, a.config.Agent.ClusterName, syncEvents)
+	if err != nil {
+		a.logger.Error("immediate event sync failed", zap.Error(err))
+		metrics.EventSyncTotal.WithLabelValues("error").Inc()
+		return
+	}
+
+	a.logger.Info("immediate event sync completed",
+		zap.Int("events", len(events)),
+		zap.Duration("duration", time.Since(start)),
+	)
+	metrics.EventSyncTotal.WithLabelValues("success").Inc()
+}
+
+func (a *Agent) doEventSync(ctx context.Context) {
+	start := time.Now()
+
+	// Get buffered events from the event watcher (clears the buffer)
+	events := a.eventWatcher.GetEvents()
+	if len(events) == 0 {
+		a.logger.Debug("no events to sync")
+		return
+	}
+
+	// Convert to sync format
+	syncEvents := make([]sync.CertManagerEvent, 0, len(events))
+	for i := range events {
+		syncEvents = append(syncEvents, convertToSyncEvent(&events[i]))
+	}
+
+	// Sync events to API
+	err := a.syncClient.SyncCertManagerEvents(ctx, a.config.Agent.ClusterName, syncEvents)
+	if err != nil {
+		a.logger.Error("event sync failed", zap.Error(err))
+		metrics.EventSyncTotal.WithLabelValues("error").Inc()
+		return
+	}
+
+	a.logger.Info("event sync completed",
+		zap.Int("events", len(events)),
+		zap.Duration("duration", time.Since(start)),
+	)
+	metrics.EventSyncTotal.WithLabelValues("success").Inc()
+}
+
+func (a *Agent) doRequestSync(ctx context.Context) {
+	start := time.Now()
+
+	// Get all tracked certificate requests
+	requests := a.requestReconciler.GetRequests()
+	if len(requests) == 0 {
+		a.logger.Debug("no certificate requests to sync")
+		return
+	}
+
+	// Convert to sync format
+	syncRequests := make([]sync.CertManagerRequest, 0, len(requests))
+	for i := range requests {
+		syncRequests = append(syncRequests, convertToSyncRequest(&requests[i]))
+	}
+
+	// Sync requests to API
+	err := a.syncClient.SyncCertManagerRequests(ctx, a.config.Agent.ClusterName, syncRequests)
+	if err != nil {
+		a.logger.Error("request sync failed", zap.Error(err))
+		metrics.RequestSyncTotal.WithLabelValues("error").Inc()
+		return
+	}
+
+	a.logger.Info("request sync completed",
+		zap.Int("requests", len(requests)),
+		zap.Duration("duration", time.Since(start)),
+	)
+	metrics.RequestSyncTotal.WithLabelValues("success").Inc()
+}
+
+func convertToSyncEvent(e *types.CertManagerEvent) sync.CertManagerEvent {
+	return sync.CertManagerEvent{
+		CertificateNamespace: e.CertificateNamespace,
+		CertificateName:      e.CertificateName,
+		Reason:               e.Reason,
+		Message:              e.Message,
+		Type:                 e.Type,
+		Timestamp:            e.Timestamp,
+		IsFailure:            e.IsFailure,
+		FailureCategory:      e.FailureCategory,
+	}
+}
+
+func convertToSyncRequest(r *types.CertificateRequestStatus) sync.CertManagerRequest {
+	req := sync.CertManagerRequest{
+		Namespace:       r.Namespace,
+		Name:            r.Name,
+		CertificateName: r.CertificateName,
+		Approved:        r.Approved,
+		Denied:          r.Denied,
+		Ready:           r.Ready,
+		Failed:          r.Failed,
+		FailureReason:   r.FailureReason,
+		FailureMessage:  r.FailureMessage,
+		FailureCategory: r.FailureCategory,
+		FailureTime:     r.FailureTime,
+		CreatedAt:       r.CreatedAt,
+		IssuedAt:        r.IssuedAt,
+	}
+	if r.Duration > 0 {
+		req.DurationMs = r.Duration.Milliseconds()
+	}
+	return req
 }
 
 func convertToSyncCert(c types.CertificateStatus) sync.CertManagerCertificate {

@@ -151,3 +151,83 @@ type CertManagerSyncResponseData struct {
 	Unchanged int       `json:"unchanged"`
 	Deleted   int       `json:"deleted"`
 }
+
+// ============================================================================
+// Phase 2: Event Sync Types
+// ============================================================================
+
+// CertManagerEventSyncRequest is the request for syncing cert-manager events
+type CertManagerEventSyncRequest struct {
+	AgentID     string             `json:"agent_id,omitempty"`
+	AgentName   string             `json:"agent_name"`
+	ClusterName string             `json:"cluster_name"`
+	Events      []CertManagerEvent `json:"events"`
+}
+
+// CertManagerEvent represents a cert-manager related Kubernetes Event for sync
+type CertManagerEvent struct {
+	CertificateNamespace string    `json:"certificate_namespace"`
+	CertificateName      string    `json:"certificate_name"`
+	Reason               string    `json:"reason"`
+	Message              string    `json:"message"`
+	Type                 string    `json:"event_type"` // Normal, Warning
+	Timestamp            time.Time `json:"timestamp"`
+	IsFailure            bool      `json:"is_failure"`
+	FailureCategory      string    `json:"failure_category,omitempty"` // issuer, acme, validation, policy
+}
+
+// CertManagerEventSyncResponse is the response from the event sync endpoint
+type CertManagerEventSyncResponse struct {
+	Success bool                             `json:"success"`
+	Error   *APIError                        `json:"error,omitempty"`
+	Data    CertManagerEventSyncResponseData `json:"data"`
+}
+
+// CertManagerEventSyncResponseData contains the event sync result details
+type CertManagerEventSyncResponseData struct {
+	SyncedAt     time.Time `json:"synced_at"`
+	EventsStored int       `json:"events_stored"`
+}
+
+// ============================================================================
+// Phase 2: CertificateRequest Sync Types
+// ============================================================================
+
+// CertManagerRequestSyncRequest is the request for syncing CertificateRequests
+type CertManagerRequestSyncRequest struct {
+	AgentID     string               `json:"agent_id,omitempty"`
+	AgentName   string               `json:"agent_name"`
+	ClusterName string               `json:"cluster_name"`
+	Requests    []CertManagerRequest `json:"requests"`
+}
+
+// CertManagerRequest represents a cert-manager CertificateRequest for sync
+type CertManagerRequest struct {
+	Namespace       string     `json:"namespace"`
+	Name            string     `json:"name"`
+	CertificateName string     `json:"certificate_name,omitempty"`
+	Approved        bool       `json:"approved"`
+	Denied          bool       `json:"denied"`
+	Ready           bool       `json:"ready"`
+	Failed          bool       `json:"failed"`
+	FailureReason   string     `json:"failure_reason,omitempty"`
+	FailureMessage  string     `json:"failure_message,omitempty"`
+	FailureCategory string     `json:"failure_category,omitempty"`
+	FailureTime     *time.Time `json:"failure_time,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
+	IssuedAt        *time.Time `json:"issued_at,omitempty"`
+	DurationMs      int64      `json:"duration_ms,omitempty"`
+}
+
+// CertManagerRequestSyncResponse is the response from the request sync endpoint
+type CertManagerRequestSyncResponse struct {
+	Success bool                               `json:"success"`
+	Error   *APIError                          `json:"error,omitempty"`
+	Data    CertManagerRequestSyncResponseData `json:"data"`
+}
+
+// CertManagerRequestSyncResponseData contains the request sync result details
+type CertManagerRequestSyncResponseData struct {
+	SyncedAt       time.Time `json:"synced_at"`
+	RequestsStored int       `json:"requests_stored"`
+}

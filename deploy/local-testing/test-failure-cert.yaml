@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: test-failure
+  namespace: demo-apps
+spec:
+  secretName: test-failure-tls
+  issuerRef:
+    name: nonexistent-issuer
+    kind: ClusterIssuer
+  dnsNames:
+    - test.example.com
