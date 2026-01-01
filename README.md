@@ -1,14 +1,21 @@
-# CertWatch Agent
+<p align="center">
+  <img src=".github/banner.png" alt="CertWatch Agent - SSL/TLS Certificate Monitoring" width="100%">
+</p>
 
-[![CI](https://github.com/certwatch-app/cw-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/certwatch-app/cw-agent/actions/workflows/ci.yml)
-[![Release](https://github.com/certwatch-app/cw-agent/actions/workflows/release.yml/badge.svg)](https://github.com/certwatch-app/cw-agent/actions/workflows/release.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/certwatch-app/cw-agent)](https://goreportcard.com/report/github.com/certwatch-app/cw-agent)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/cw-agent)](https://artifacthub.io/packages/search?repo=cw-agent)
-[![Kubernetes](https://img.shields.io/badge/Kubernetes-1.19+-blue?logo=kubernetes&logoColor=white)](https://kubernetes.io/)
-[![cert-manager](https://img.shields.io/badge/cert--manager-compatible-green?logo=kubernetes&logoColor=white)](https://cert-manager.io/)
+<p align="center">
+  <a href="https://github.com/certwatch-app/cw-agent/actions/workflows/ci.yml"><img src="https://github.com/certwatch-app/cw-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/certwatch-app/cw-agent/actions/workflows/release.yml"><img src="https://github.com/certwatch-app/cw-agent/actions/workflows/release.yml/badge.svg" alt="Release"></a>
+  <a href="https://goreportcard.com/report/github.com/certwatch-app/cw-agent"><img src="https://goreportcard.com/badge/github.com/certwatch-app/cw-agent" alt="Go Report Card"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
+  <a href="https://artifacthub.io/packages/search?repo=cw-agent"><img src="https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/cw-agent" alt="Artifact Hub"></a>
+</p>
 
-**Monitor all your SSL/TLS certificates in one place.** CertWatch Agent syncs certificate data from your infrastructure to the [CertWatch](https://certwatch.app) cloud dashboard for unified monitoring, alerting, and expiry tracking.
+<p align="center">
+  <b>Monitor all your SSL/TLS certificates in one place.</b><br>
+  CertWatch Agent syncs certificate data from your infrastructure to the <a href="https://certwatch.app">CertWatch</a> cloud dashboard for unified monitoring, alerting, and expiry tracking.
+</p>
+
+---
 
 ## Features
 
@@ -89,6 +96,8 @@ See [Kubernetes Guide](docs/kubernetes.md) for production deployment instruction
 |-------|-------------|
 | [Getting Started](docs/getting-started.md) | Installation and basic setup |
 | [CLI Reference](docs/cli-reference.md) | All commands and configuration options |
+| [Docker Guide](docs/docker.md) | Container deployment with Docker Compose |
+| [Linux Guide](docs/linux.md) | systemd service for local monitoring |
 | [Kubernetes Guide](docs/kubernetes.md) | Helm deployment and GitOps |
 | [cert-manager Integration](docs/cert-manager.md) | Monitor cert-manager certificates |
 | [Metrics & Observability](docs/metrics.md) | Prometheus metrics and health endpoints |
@@ -264,3 +273,13 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for de
 ## License
 
 Apache 2.0 - see [LICENSE](LICENSE) for details.
+
+## Third-Party Trademarks
+
+The banner and documentation include logos of third-party projects for illustrative purposes:
+
+- **Docker** and the Docker logo are trademarks of Docker, Inc.
+- **Kubernetes** is a registered trademark of The Linux Foundation.
+- **Prometheus** is a Cloud Native Computing Foundation project.
+- **cert-manager** is a Cloud Native Computing Foundation project.
+- **Tux** logo by Larry Ewing (lewing@isc.tamu.edu) using The GIMP.
