@@ -8,6 +8,7 @@ require (
 	github.com/cert-manager/cert-manager v1.16.0
 	github.com/charmbracelet/huh v0.8.0
 	github.com/charmbracelet/lipgloss v1.1.0
+	github.com/go-logr/zapr v1.3.0
 	github.com/prometheus/client_golang v1.20.4
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.19.0

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	cmapi "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -13,6 +14,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"github.com/certwatch-app/cw-agent/internal/certmanager/config"
@@ -43,6 +45,10 @@ type Agent struct {
 // New creates a new cert-manager agent
 func New(cfg *config.Config, stateManager *state.Manager) (*Agent, error) {
 	logger := setupLogger(cfg.Agent.LogLevel)
+
+	// Set up controller-runtime logger to use zap
+	// This suppresses the "log.SetLogger(...) was never called" warning
+	log.SetLogger(zapr.NewLogger(logger))
 
 	// Create sync client using the config adapter
 	syncCfg := &sync.ClientConfig{

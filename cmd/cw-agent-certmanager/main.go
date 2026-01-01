@@ -62,7 +62,13 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load state (agent ID persistence)
-	stateManager := state.NewManager(cfgFile)
+	// Use dedicated state directory if it exists (for containers with read-only config mounts)
+	var stateManager *state.Manager
+	if _, err := os.Stat(state.DefaultStateDir); err == nil {
+		stateManager = state.NewManagerWithStateDir(state.DefaultStateDir)
+	} else {
+		stateManager = state.NewManager(cfgFile)
+	}
 	if loadErr := stateManager.Load(); loadErr != nil {
 		// Don't fail on state load errors - we'll create new state
 		fmt.Printf("Note: %v (will create new state)\n", loadErr)

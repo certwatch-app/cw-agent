@@ -38,8 +38,8 @@ metadata:
   namespace: certwatch
 type: Opaque
 stringData:
-  # Replace with your actual API key
-  api-key: "cw_test_key_replace_me"
+  # Replace with your actual API key (must match format: cw_<prefix>_<secret>)
+  api-key: "cw_a386593c_6b61d2c5231a45d303e90abd4d524f47966a4bfd5bf279bb15a28071010b6aa7"
 
 ---
 apiVersion: v1
@@ -156,10 +156,14 @@ spec:
             - name: config
               mountPath: /etc/certwatch
               readOnly: true
+            - name: state
+              mountPath: /var/lib/certwatch
       volumes:
         - name: config
           configMap:
             name: cw-agent-certmanager-config
+        - name: state
+          emptyDir: {}
 
 ---
 apiVersion: v1
