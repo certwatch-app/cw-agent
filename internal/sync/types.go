@@ -94,3 +94,60 @@ type HeartbeatResponse struct {
 	AgentID    string    `json:"agent_id"`
 	ServerTime time.Time `json:"server_time"`
 }
+
+// CertManagerSyncRequest is the request for syncing cert-manager certificates
+type CertManagerSyncRequest struct {
+	AgentID      string                   `json:"agent_id,omitempty"`
+	AgentName    string                   `json:"agent_name"`
+	AgentVersion string                   `json:"agent_version,omitempty"`
+	ClusterName  string                   `json:"cluster_name"`
+	Certificates []CertManagerCertificate `json:"certificates"`
+}
+
+// CertManagerCertificate is a cert-manager certificate for sync
+type CertManagerCertificate struct {
+	// Identity
+	Namespace  string `json:"namespace"`
+	Name       string `json:"name"`
+	SecretName string `json:"secret_name"`
+
+	// Spec
+	CommonName string   `json:"common_name,omitempty"`
+	DNSNames   []string `json:"dns_names,omitempty"`
+
+	// Issuer
+	IssuerName  string `json:"issuer_name"`
+	IssuerKind  string `json:"issuer_kind"`
+	IssuerGroup string `json:"issuer_group,omitempty"`
+
+	// Status
+	Ready       bool   `json:"ready"`
+	ReadyReason string `json:"ready_reason,omitempty"`
+	Issuing     bool   `json:"issuing"`
+
+	// Timing
+	NotBefore   *time.Time `json:"not_before,omitempty"`
+	NotAfter    *time.Time `json:"not_after,omitempty"`
+	RenewalTime *time.Time `json:"renewal_time,omitempty"`
+
+	// Health
+	Revision       int `json:"revision"`
+	FailedAttempts int `json:"failed_attempts"`
+}
+
+// CertManagerSyncResponse is the response from the cert-manager sync endpoint
+type CertManagerSyncResponse struct {
+	Success bool                        `json:"success"`
+	AgentID string                      `json:"agent_id"`
+	Error   *APIError                   `json:"error,omitempty"`
+	Data    CertManagerSyncResponseData `json:"data"`
+}
+
+// CertManagerSyncResponseData contains the sync result details for cert-manager
+type CertManagerSyncResponseData struct {
+	SyncedAt  time.Time `json:"synced_at"`
+	Created   int       `json:"created"`
+	Updated   int       `json:"updated"`
+	Unchanged int       `json:"unchanged"`
+	Deleted   int       `json:"deleted"`
+}

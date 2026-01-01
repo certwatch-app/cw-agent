@@ -1,0 +1,31 @@
+# Build stage
+FROM golang:1.23-alpine AS builder
+
+WORKDIR /app
+
+# Copy go mod files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source
+COPY . .
+
+# Build
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG DATE=unknown
+
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags="-s -w -X github.com/certwatch-app/cw-agent/internal/version.Version=${VERSION} -X github.com/certwatch-app/cw-agent/internal/version.Commit=${COMMIT} -X github.com/certwatch-app/cw-agent/internal/version.Date=${DATE}" \
+    -o cw-agent-certmanager \
+    ./cmd/cw-agent-certmanager
+
+# Runtime stage - distroless for security
+FROM gcr.io/distroless/static-debian12:nonroot
+
+COPY --from=builder /app/cw-agent-certmanager /cw-agent-certmanager
+
+USER nonroot:nonroot
+
+ENTRYPOINT ["/cw-agent-certmanager"]
+CMD ["-c", "/etc/certwatch/certwatch.yaml"]

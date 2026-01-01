@@ -1,0 +1,4 @@
+﻿FROM gcr.io/distroless/base-debian12:nonroot
+COPY bin/cw-agent-certmanager-linux-amd64 /cw-agent-certmanager
+USER nonroot:nonroot
+ENTRYPOINT ["/cw-agent-certmanager"]

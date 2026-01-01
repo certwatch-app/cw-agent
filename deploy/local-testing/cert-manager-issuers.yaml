@@ -1,0 +1,81 @@
+# cert-manager issuers for local testing
+# Includes self-signed issuer for local development
+# and Let's Encrypt staging for internet-exposed testing
+---
+# Self-signed issuer for local development (no internet required)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-issuer
+spec:
+  selfSigned: {}
+
+---
+# CA issuer - creates a local CA from the self-signed issuer
+# This is useful for testing certificate chains
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: local-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  commonName: certwatch-local-ca
+  secretName: local-ca-key-pair
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: selfsigned-issuer
+    kind: ClusterIssuer
+    group: cert-manager.io
+  duration: 87600h # 10 years
+  renewBefore: 8760h # 1 year
+
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: local-ca-issuer
+spec:
+  ca:
+    secretName: local-ca-key-pair
+
+---
+# Let's Encrypt Staging issuer
+# Use this only if you have a real domain pointing to your cluster
+# IMPORTANT: Replace YOUR_EMAIL with your actual email
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    # Use staging environment for testing (not rate-limited)
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: your-email@example.com  # CHANGE THIS!
+    privateKeySecretRef:
+      name: letsencrypt-staging-key
+    solvers:
+      # HTTP-01 challenge solver using ingress
+      - http01:
+          ingress:
+            ingressClassName: nginx
+
+---
+# Let's Encrypt Production issuer
+# Only use after testing with staging!
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: your-email@example.com  # CHANGE THIS!
+    privateKeySecretRef:
+      name: letsencrypt-prod-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: nginx

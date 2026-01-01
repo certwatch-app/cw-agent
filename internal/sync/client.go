@@ -286,3 +286,106 @@ func getHostname() string {
 	// This is a simplified version - could be enhanced
 	return ""
 }
+
+// ClientConfig holds configuration for creating a sync client without the full config package
+type ClientConfig struct {
+	Endpoint string
+	APIKey   string
+	Timeout  time.Duration
+}
+
+// NewWithConfig creates a new sync Client with explicit configuration
+// This is used by the cert-manager controller which has its own config package
+func NewWithConfig(cfg *ClientConfig, agentName string, logger *zap.Logger, stateManager *state.Manager) *Client {
+	timeout := cfg.Timeout
+	if timeout == 0 {
+		timeout = 30 * time.Second
+	}
+
+	return &Client{
+		endpoint:     cfg.Endpoint,
+		apiKey:       cfg.APIKey,
+		agentName:    agentName,
+		stateManager: stateManager,
+		httpClient: &http.Client{
+			Timeout: timeout,
+		},
+		logger: logger,
+	}
+}
+
+// SyncCertManagerCertificates syncs cert-manager certificates to the API
+func (c *Client) SyncCertManagerCertificates(ctx context.Context, clusterName string, certs []CertManagerCertificate) (*CertManagerSyncResponse, error) {
+	req := &CertManagerSyncRequest{
+		AgentID:      c.stateManager.GetAgentID(),
+		AgentName:    c.agentName,
+		AgentVersion: version.GetVersion(),
+		ClusterName:  clusterName,
+		Certificates: certs,
+	}
+
+	url := c.endpoint + "/api/v1/agent/certmanager/sync"
+
+	jsonData, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("X-API-Key", c.apiKey)
+	httpReq.Header.Set("User-Agent", fmt.Sprintf("cw-agent-certmanager/%s", version.GetVersion()))
+
+	c.logger.Debug("sending certmanager sync request",
+		zap.String("url", url),
+		zap.Int("certificates", len(certs)),
+	)
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	c.logger.Debug("received response",
+		zap.Int("status", resp.StatusCode),
+		zap.Int("body_length", len(body)),
+	)
+
+	if resp.StatusCode >= 400 {
+		var errResp struct {
+			Error   *APIError `json:"error"`
+			Success bool      `json:"success"`
+		}
+		if unmarshalErr := json.Unmarshal(body, &errResp); unmarshalErr == nil && errResp.Error != nil {
+			return nil, fmt.Errorf("API error (%s): %s", errResp.Error.Code, errResp.Error.Message)
+		}
+		return nil, fmt.Errorf("API error %d: %s", resp.StatusCode, string(body))
+	}
+
+	var syncResp CertManagerSyncResponse
+	if err := json.Unmarshal(body, &syncResp); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	// Persist agent ID for future syncs
+	if syncResp.Success && syncResp.AgentID != "" {
+		c.stateManager.SetAgentID(syncResp.AgentID)
+		c.stateManager.SetAgentName(c.agentName)
+		c.stateManager.SetLastSyncAt(syncResp.Data.SyncedAt)
+		if err := c.stateManager.Save(); err != nil {
+			c.logger.Warn("failed to save state", zap.Error(err))
+		}
+	}
+
+	return &syncResp, nil
+}

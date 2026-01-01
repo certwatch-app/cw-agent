@@ -1,0 +1,111 @@
+# Sample certificates for testing
+# These demonstrate different cert-manager scenarios
+---
+# Certificate 1: Simple self-signed certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: nginx-demo-tls
+  namespace: demo-apps
+spec:
+  secretName: nginx-demo-tls
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days before expiry
+  issuerRef:
+    name: local-ca-issuer
+    kind: ClusterIssuer
+  commonName: nginx.local
+  dnsNames:
+    - nginx.local
+    - nginx-demo.demo-apps.svc.cluster.local
+  privateKey:
+    algorithm: RSA
+    size: 2048
+
+---
+# Certificate 2: ECDSA certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: httpbin-tls
+  namespace: demo-apps
+spec:
+  secretName: httpbin-tls
+  duration: 720h # 30 days
+  renewBefore: 168h # 7 days before expiry
+  issuerRef:
+    name: local-ca-issuer
+    kind: ClusterIssuer
+  commonName: httpbin.local
+  dnsNames:
+    - httpbin.local
+    - httpbin.demo-apps.svc.cluster.local
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+
+---
+# Certificate 3: Multi-domain certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: echo-server-tls
+  namespace: demo-apps
+spec:
+  secretName: echo-server-tls
+  duration: 4320h # 180 days
+  renewBefore: 720h # 30 days before expiry
+  issuerRef:
+    name: local-ca-issuer
+    kind: ClusterIssuer
+  commonName: echo.local
+  dnsNames:
+    - echo.local
+    - echo-server.demo-apps.svc.cluster.local
+    - api.echo.local
+    - admin.echo.local
+  privateKey:
+    algorithm: RSA
+    size: 4096
+
+---
+# Certificate 4: Short-lived certificate (for testing renewal)
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: short-lived-cert
+  namespace: demo-apps
+spec:
+  secretName: short-lived-tls
+  duration: 24h # 1 day
+  renewBefore: 8h # 8 hours before expiry
+  issuerRef:
+    name: local-ca-issuer
+    kind: ClusterIssuer
+  commonName: shortlived.local
+  dnsNames:
+    - shortlived.local
+  privateKey:
+    algorithm: RSA
+    size: 2048
+
+---
+# Certificate 5: Direct self-signed (bypasses CA)
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: selfsigned-direct
+  namespace: demo-apps
+spec:
+  secretName: selfsigned-direct-tls
+  duration: 8760h # 1 year
+  renewBefore: 720h # 30 days
+  issuerRef:
+    name: selfsigned-issuer
+    kind: ClusterIssuer
+  commonName: selfsigned.local
+  dnsNames:
+    - selfsigned.local
+  privateKey:
+    algorithm: ECDSA
+    size: 384

@@ -18,12 +18,13 @@ GOVET=$(GOCMD) vet
 
 # Binary names
 BINARY_NAME=cw-agent
+BINARY_CERTMANAGER=cw-agent-certmanager
 BINARY_DIR=bin
 
 # Default target
 .DEFAULT_GOAL := build
 
-.PHONY: all build clean test lint fmt vet deps tidy help
+.PHONY: all build build-certmanager clean test lint fmt vet deps tidy help
 
 ## build: Build the binary
 build:
@@ -115,6 +116,47 @@ docker-build:
 	@echo "Building Docker image..."
 	docker build -t certwatch-app/cw-agent:$(VERSION) .
 	docker tag certwatch-app/cw-agent:$(VERSION) certwatch-app/cw-agent:latest
+
+# ============================================================================
+# cert-manager Controller Targets
+# ============================================================================
+
+## build-certmanager: Build the cert-manager controller
+build-certmanager:
+	@echo "Building $(BINARY_CERTMANAGER)..."
+	@mkdir -p $(BINARY_DIR)
+	$(GOBUILD) $(LDFLAGS) -o $(BINARY_DIR)/$(BINARY_CERTMANAGER) ./cmd/cw-agent-certmanager
+
+## build-certmanager-linux: Build cert-manager controller for Linux
+build-certmanager-linux:
+	@echo "Building $(BINARY_CERTMANAGER) for Linux..."
+	@mkdir -p $(BINARY_DIR)
+	GOOS=linux GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BINARY_DIR)/$(BINARY_CERTMANAGER)-linux-amd64 ./cmd/cw-agent-certmanager
+	GOOS=linux GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o $(BINARY_DIR)/$(BINARY_CERTMANAGER)-linux-arm64 ./cmd/cw-agent-certmanager
+
+## docker-build-certmanager: Build Docker image for cert-manager controller
+docker-build-certmanager:
+	@echo "Building Docker image for cert-manager controller..."
+	docker build -f Dockerfile.certmanager \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT=$(GIT_COMMIT) \
+		--build-arg DATE=$(BUILD_DATE) \
+		-t certwatch-app/cw-agent-certmanager:$(VERSION) .
+	docker tag certwatch-app/cw-agent-certmanager:$(VERSION) certwatch-app/cw-agent-certmanager:latest
+
+## test-certmanager: Run cert-manager controller tests
+test-certmanager:
+	@echo "Running cert-manager controller tests..."
+	$(GOTEST) -v -race ./internal/certmanager/...
+
+## run-certmanager: Run the cert-manager controller with test config
+run-certmanager: build-certmanager
+	@echo "Running cert-manager controller..."
+	./$(BINARY_DIR)/$(BINARY_CERTMANAGER) -c testdata/certwatch-certmanager.yaml
+
+## validate-certmanager: Validate cert-manager controller config
+validate-certmanager: build-certmanager
+	./$(BINARY_DIR)/$(BINARY_CERTMANAGER) validate -c testdata/certwatch-certmanager.yaml
 
 ## help: Show this help
 help:

@@ -1,0 +1,546 @@
+# Prometheus Helm chart values for local testing
+# Uses kube-prometheus-stack chart from prometheus-community
+#
+# Install with:
+#   helm install prometheus prometheus-community/kube-prometheus-stack \
+#     --namespace monitoring --create-namespace \
+#     -f prometheus-values.yaml
+
+# Prometheus configuration
+prometheus:
+  prometheusSpec:
+    # Scrape interval
+    scrapeInterval: 15s
+    evaluationInterval: 15s
+
+    # Resource limits for local testing
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+
+    # Storage - minimal for local testing
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+
+    # Enable scraping of all ServiceMonitors
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+
+    # Additional scrape configs for cw-agent-certmanager
+    additionalScrapeConfigs:
+      - job_name: 'cw-agent-certmanager'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - certwatch
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: cw-agent-certmanager
+          - source_labels: [__meta_kubernetes_pod_container_port_number]
+            action: keep
+            regex: '9402'
+
+  service:
+    type: NodePort
+    nodePort: 30090
+
+# Grafana configuration
+grafana:
+  enabled: true
+
+  # Admin credentials (change in production!)
+  adminUser: admin
+  adminPassword: certwatch123
+
+  service:
+    type: NodePort
+    nodePort: 30030
+
+  # Resource limits
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  # Pre-configured dashboards
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: 'certwatch'
+          orgId: 1
+          folder: 'CertWatch'
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/certwatch
+
+  # CertWatch dashboard
+  dashboards:
+    certwatch:
+      certmanager-agent:
+        json: |
+          {
+            "annotations": {
+              "list": []
+            },
+            "editable": true,
+            "fiscalYearStartMonth": 0,
+            "graphTooltip": 0,
+            "id": null,
+            "links": [],
+            "panels": [
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "prometheus"
+                },
+                "fieldConfig": {
+                  "defaults": {
+                    "color": {
+                      "mode": "palette-classic"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "green",
+                          "value": null
+                        }
+                      ]
+                    },
+                    "unit": "short"
+                  },
+                  "overrides": []
+                },
+                "gridPos": {
+                  "h": 6,
+                  "w": 6,
+                  "x": 0,
+                  "y": 0
+                },
+                "id": 1,
+                "options": {
+                  "colorMode": "value",
+                  "graphMode": "area",
+                  "justifyMode": "auto",
+                  "orientation": "auto",
+                  "reduceOptions": {
+                    "calcs": [
+                      "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                  },
+                  "textMode": "auto"
+                },
+                "pluginVersion": "9.3.6",
+                "targets": [
+                  {
+                    "expr": "certwatch_certmanager_certificates_watched",
+                    "refId": "A"
+                  }
+                ],
+                "title": "Certificates Watched",
+                "type": "stat"
+              },
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "prometheus"
+                },
+                "fieldConfig": {
+                  "defaults": {
+                    "color": {
+                      "mode": "thresholds"
+                    },
+                    "mappings": [
+                      {
+                        "options": {
+                          "0": {
+                            "color": "red",
+                            "index": 1,
+                            "text": "Not Ready"
+                          },
+                          "1": {
+                            "color": "green",
+                            "index": 0,
+                            "text": "Ready"
+                          }
+                        },
+                        "type": "value"
+                      }
+                    ],
+                    "thresholds": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "red",
+                          "value": null
+                        },
+                        {
+                          "color": "green",
+                          "value": 1
+                        }
+                      ]
+                    }
+                  },
+                  "overrides": []
+                },
+                "gridPos": {
+                  "h": 8,
+                  "w": 12,
+                  "x": 6,
+                  "y": 0
+                },
+                "id": 2,
+                "options": {
+                  "displayMode": "lcd",
+                  "minVizHeight": 10,
+                  "minVizWidth": 0,
+                  "orientation": "horizontal",
+                  "reduceOptions": {
+                    "calcs": [
+                      "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                  },
+                  "showUnfilled": true
+                },
+                "pluginVersion": "9.3.6",
+                "targets": [
+                  {
+                    "expr": "certwatch_certmanager_certificate_ready",
+                    "legendFormat": "{{namespace}}/{{name}}",
+                    "refId": "A"
+                  }
+                ],
+                "title": "Certificate Status",
+                "type": "bargauge"
+              },
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "prometheus"
+                },
+                "fieldConfig": {
+                  "defaults": {
+                    "color": {
+                      "mode": "palette-classic"
+                    },
+                    "custom": {
+                      "axisCenteredZero": false,
+                      "axisColorMode": "text",
+                      "axisLabel": "",
+                      "axisPlacement": "auto",
+                      "barAlignment": 0,
+                      "drawStyle": "line",
+                      "fillOpacity": 10,
+                      "gradientMode": "none",
+                      "hideFrom": {
+                        "legend": false,
+                        "tooltip": false,
+                        "viz": false
+                      },
+                      "lineInterpolation": "linear",
+                      "lineWidth": 1,
+                      "pointSize": 5,
+                      "scaleDistribution": {
+                        "type": "linear"
+                      },
+                      "showPoints": "auto",
+                      "spanNulls": false,
+                      "stacking": {
+                        "group": "A",
+                        "mode": "none"
+                      },
+                      "thresholdsStyle": {
+                        "mode": "off"
+                      }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "green",
+                          "value": null
+                        },
+                        {
+                          "color": "red",
+                          "value": 80
+                        }
+                      ]
+                    },
+                    "unit": "d"
+                  },
+                  "overrides": []
+                },
+                "gridPos": {
+                  "h": 8,
+                  "w": 18,
+                  "x": 0,
+                  "y": 8
+                },
+                "id": 3,
+                "options": {
+                  "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                  },
+                  "tooltip": {
+                    "mode": "single",
+                    "sort": "none"
+                  }
+                },
+                "targets": [
+                  {
+                    "expr": "certwatch_certmanager_certificate_days_until_expiry",
+                    "legendFormat": "{{namespace}}/{{name}}",
+                    "refId": "A"
+                  }
+                ],
+                "title": "Days Until Expiry",
+                "type": "timeseries"
+              },
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "prometheus"
+                },
+                "fieldConfig": {
+                  "defaults": {
+                    "color": {
+                      "mode": "palette-classic"
+                    },
+                    "custom": {
+                      "axisCenteredZero": false,
+                      "axisColorMode": "text",
+                      "axisLabel": "",
+                      "axisPlacement": "auto",
+                      "barAlignment": 0,
+                      "drawStyle": "line",
+                      "fillOpacity": 10,
+                      "gradientMode": "none",
+                      "hideFrom": {
+                        "legend": false,
+                        "tooltip": false,
+                        "viz": false
+                      },
+                      "lineInterpolation": "linear",
+                      "lineWidth": 1,
+                      "pointSize": 5,
+                      "scaleDistribution": {
+                        "type": "linear"
+                      },
+                      "showPoints": "auto",
+                      "spanNulls": false,
+                      "stacking": {
+                        "group": "A",
+                        "mode": "none"
+                      },
+                      "thresholdsStyle": {
+                        "mode": "off"
+                      }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "green",
+                          "value": null
+                        }
+                      ]
+                    },
+                    "unit": "short"
+                  },
+                  "overrides": []
+                },
+                "gridPos": {
+                  "h": 8,
+                  "w": 12,
+                  "x": 0,
+                  "y": 16
+                },
+                "id": 4,
+                "options": {
+                  "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                  },
+                  "tooltip": {
+                    "mode": "single",
+                    "sort": "none"
+                  }
+                },
+                "targets": [
+                  {
+                    "expr": "rate(certwatch_certmanager_reconcile_total[5m])",
+                    "legendFormat": "{{controller}} - {{result}}",
+                    "refId": "A"
+                  }
+                ],
+                "title": "Reconcile Rate",
+                "type": "timeseries"
+              },
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "prometheus"
+                },
+                "fieldConfig": {
+                  "defaults": {
+                    "color": {
+                      "mode": "palette-classic"
+                    },
+                    "custom": {
+                      "axisCenteredZero": false,
+                      "axisColorMode": "text",
+                      "axisLabel": "",
+                      "axisPlacement": "auto",
+                      "barAlignment": 0,
+                      "drawStyle": "line",
+                      "fillOpacity": 10,
+                      "gradientMode": "none",
+                      "hideFrom": {
+                        "legend": false,
+                        "tooltip": false,
+                        "viz": false
+                      },
+                      "lineInterpolation": "linear",
+                      "lineWidth": 1,
+                      "pointSize": 5,
+                      "scaleDistribution": {
+                        "type": "linear"
+                      },
+                      "showPoints": "auto",
+                      "spanNulls": false,
+                      "stacking": {
+                        "group": "A",
+                        "mode": "none"
+                      },
+                      "thresholdsStyle": {
+                        "mode": "off"
+                      }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "green",
+                          "value": null
+                        }
+                      ]
+                    },
+                    "unit": "short"
+                  },
+                  "overrides": []
+                },
+                "gridPos": {
+                  "h": 8,
+                  "w": 12,
+                  "x": 12,
+                  "y": 16
+                },
+                "id": 5,
+                "options": {
+                  "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                  },
+                  "tooltip": {
+                    "mode": "single",
+                    "sort": "none"
+                  }
+                },
+                "targets": [
+                  {
+                    "expr": "rate(certwatch_certmanager_sync_total[5m])",
+                    "legendFormat": "{{status}}",
+                    "refId": "A"
+                  }
+                ],
+                "title": "Sync Rate",
+                "type": "timeseries"
+              }
+            ],
+            "refresh": "10s",
+            "schemaVersion": 37,
+            "style": "dark",
+            "tags": [
+              "certwatch",
+              "cert-manager"
+            ],
+            "templating": {
+              "list": []
+            },
+            "time": {
+              "from": "now-1h",
+              "to": "now"
+            },
+            "timepicker": {},
+            "timezone": "browser",
+            "title": "CertWatch Agent - cert-manager",
+            "uid": "certwatch-certmanager",
+            "version": 1,
+            "weekStart": ""
+          }
+
+# AlertManager configuration
+alertmanager:
+  enabled: true
+  service:
+    type: NodePort
+    nodePort: 30903
+
+  alertmanagerSpec:
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+
+# Node exporter - optional for local testing
+nodeExporter:
+  enabled: false
+
+# Kube-state-metrics
+kubeStateMetrics:
+  enabled: true
+
+# Prometheus operator
+prometheusOperator:
+  resources:
+    limits:
+      cpu: 200m
+      memory: 200Mi
+    requests:
+      cpu: 100m
+      memory: 100Mi
