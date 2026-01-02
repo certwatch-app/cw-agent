@@ -51,6 +51,9 @@ jobs:
           version: latest
           args: --timeout=5m
 
+  # ============================================================
+  # cw-agent build (Linux, macOS, Windows)
+  # ============================================================
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -72,7 +75,7 @@ jobs:
           go-version: '1.24'
           cache: true
 
-      - name: Build
+      - name: Build cw-agent
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
@@ -92,3 +95,44 @@ jobs:
         with:
           name: cw-agent-${{ matrix.goos }}-${{ matrix.goarch }}
           path: cw-agent-*
+
+  # ============================================================
+  # cw-agent-certmanager build (Linux only - Kubernetes)
+  # ============================================================
+  build-certmanager:
+    name: Build certmanager
+    runs-on: ubuntu-latest
+    needs: [test, lint]
+    strategy:
+      matrix:
+        goarch: [amd64, arm64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Build cw-agent-certmanager
+        env:
+          GOOS: linux
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
+          GIT_COMMIT=$(git rev-parse --short HEAD)
+          BUILD_DATE=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+
+          go build -ldflags "-X github.com/certwatch-app/cw-agent/internal/version.Version=${VERSION} \
+                            -X github.com/certwatch-app/cw-agent/internal/version.GitCommit=${GIT_COMMIT} \
+                            -X github.com/certwatch-app/cw-agent/internal/version.BuildDate=${BUILD_DATE}" \
+            -o cw-agent-certmanager-linux-${{ matrix.goarch }} \
+            ./cmd/cw-agent-certmanager
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cw-agent-certmanager-linux-${{ matrix.goarch }}
+          path: cw-agent-certmanager-*
