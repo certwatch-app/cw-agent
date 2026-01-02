@@ -340,15 +340,10 @@ func (c *Client) SyncCertManagerCertificates(ctx context.Context, clusterName st
 	httpReq.Header.Set("X-API-Key", c.apiKey)
 	httpReq.Header.Set("User-Agent", fmt.Sprintf("cw-agent-certmanager/%s", version.GetVersion()))
 
-	// Debug: log API key format (first 12 chars only for security)
-	keyPreview := c.apiKey
-	if len(keyPreview) > 12 {
-		keyPreview = keyPreview[:12] + "..."
-	}
 	c.logger.Debug("sending certmanager sync request",
 		zap.String("url", url),
 		zap.Int("certificates", len(certs)),
-		zap.String("api_key_preview", keyPreview),
+		zap.Bool("api_key_present", c.apiKey != ""),
 		zap.Int("api_key_length", len(c.apiKey)),
 	)
 
