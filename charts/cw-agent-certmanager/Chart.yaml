@@ -2,8 +2,8 @@ apiVersion: v2
 name: cw-agent-certmanager
 description: CertWatch Agent for cert-manager - Monitors Kubernetes certificates managed by cert-manager
 type: application
-version: 0.5.1
-appVersion: "0.5.1"
+version: 0.5.2
+appVersion: "0.5.2"
 keywords:
   - ssl
   - tls

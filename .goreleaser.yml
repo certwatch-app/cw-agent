@@ -51,7 +51,7 @@ builds:
 
 archives:
   # Only archive cw-agent (certmanager is K8s-only, distributed via Docker)
-  - id: default
+  - id: cw-agent
     builds:
       - cw-agent
     formats:
