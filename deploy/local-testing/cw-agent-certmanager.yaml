@@ -18,7 +18,7 @@ data:
   certwatch.yaml: |
     api:
       endpoint: "https://api.certwatch.app"
-      key: "cw_a386593c_6b61d2c5231a45d303e90abd4d524f47966a4bfd5bf279bb15a28071010b6aa7"
+      key: "cw_a386593c_TestKeY"
       timeout: 30s
 
     agent:
@@ -39,7 +39,7 @@ metadata:
 type: Opaque
 stringData:
   # Replace with your actual API key (must match format: cw_<prefix>_<secret>)
-  api-key: "cw_a386593c_6b61d2c5231a45d303e90abd4d524f47966a4bfd5bf279bb15a28071010b6aa7"
+  api-key: "cw_a386593c_TestKeY"
 
 ---
 apiVersion: v1

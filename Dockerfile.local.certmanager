@@ -1,0 +1,6 @@
+# Dockerfile.local.certmanager - For local development/testing
+FROM gcr.io/distroless/base-debian12:nonroot
+COPY bin/cw-agent-certmanager-linux-arm64 /cw-agent-certmanager
+USER nonroot:nonroot
+ENTRYPOINT ["/cw-agent-certmanager"]
+CMD ["-c", "/etc/certwatch/certwatch.yaml"]

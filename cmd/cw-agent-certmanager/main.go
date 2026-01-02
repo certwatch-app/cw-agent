@@ -124,6 +124,10 @@ func loadConfig() (*config.Config, error) {
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 
+	// Explicitly bind API key from environment variable
+	//nolint:errcheck // BindEnv always succeeds when args are valid
+	v.BindEnv("api.key", "CW_API_KEY")
+
 	// Load config file if provided
 	if cfgFile != "" {
 		v.SetConfigFile(cfgFile)

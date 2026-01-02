@@ -1,4 +1,11 @@
-﻿FROM gcr.io/distroless/base-debian12:nonroot
-COPY bin/cw-agent-certmanager-linux-amd64 /cw-agent-certmanager
+﻿# Dockerfile.local - For local development/testing of cw-agent
+# Usage:
+#   GOOS=linux GOARCH=arm64 go build -o bin/cw-agent-linux-arm64 ./cmd/cw-agent
+#   docker build -f Dockerfile.local -t cw-agent:dev .
+#   kind load docker-image cw-agent:dev --name certwatch-test
+
+FROM gcr.io/distroless/base-debian12:nonroot
+COPY bin/cw-agent-linux-arm64 /cw-agent
 USER nonroot:nonroot
-ENTRYPOINT ["/cw-agent-certmanager"]
+ENTRYPOINT ["/cw-agent"]
+CMD ["start", "-c", "/etc/certwatch/certwatch.yaml"]

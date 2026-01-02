@@ -1,31 +1,16 @@
-# Build stage
-FROM golang:1.23-alpine AS builder
+# GoReleaser Dockerfile for cw-agent-certmanager
+# Uses pre-built binary from GoReleaser
+# Using base-debian12 which includes CA certificates needed for HTTPS
+FROM gcr.io/distroless/base-debian12:nonroot
 
-WORKDIR /app
+# Copy the pre-built binary from GoReleaser
+COPY cw-agent-certmanager /cw-agent-certmanager
 
-# Copy go mod files
-COPY go.mod go.sum ./
-RUN go mod download
-
-# Copy source
-COPY . .
-
-# Build
-ARG VERSION=dev
-ARG COMMIT=unknown
-ARG DATE=unknown
-
-RUN CGO_ENABLED=0 GOOS=linux go build \
-    -ldflags="-s -w -X github.com/certwatch-app/cw-agent/internal/version.Version=${VERSION} -X github.com/certwatch-app/cw-agent/internal/version.Commit=${COMMIT} -X github.com/certwatch-app/cw-agent/internal/version.Date=${DATE}" \
-    -o cw-agent-certmanager \
-    ./cmd/cw-agent-certmanager
-
-# Runtime stage - distroless for security
-FROM gcr.io/distroless/static-debian12:nonroot
-
-COPY --from=builder /app/cw-agent-certmanager /cw-agent-certmanager
-
+# Set user
 USER nonroot:nonroot
 
+# Set entrypoint
 ENTRYPOINT ["/cw-agent-certmanager"]
+
+# Default command
 CMD ["-c", "/etc/certwatch/certwatch.yaml"]
