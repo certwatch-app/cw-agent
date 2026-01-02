@@ -1,3 +1,4 @@
+{{- include "cw-agent.validateApiKey" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -40,15 +41,8 @@ spec:
             - name: CW_API_KEY
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.apiKey.value }}
-                  name: {{ include "cw-agent.fullname" . }}-api-key
-                  key: api-key
-                  {{- else if .Values.apiKey.existingSecret.name }}
-                  name: {{ .Values.apiKey.existingSecret.name }}
-                  key: {{ .Values.apiKey.existingSecret.key | default "api-key" }}
-                  {{- else }}
-                  {{- fail "apiKey.value or apiKey.existingSecret.name is required" }}
-                  {{- end }}
+                  name: {{ include "cw-agent.apiKeySecretName" . }}
+                  key: {{ include "cw-agent.apiKeySecretKey" . }}
           ports:
             {{- if gt (int .Values.agent.metricsPort) 0 }}
             - name: metrics

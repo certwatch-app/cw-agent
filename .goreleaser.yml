@@ -10,6 +10,7 @@ before:
     - go mod tidy
 
 builds:
+  # Main cw-agent binary - for Linux, macOS, Windows
   - id: cw-agent
     main: ./cmd/cw-agent
     binary: cw-agent
@@ -31,8 +32,28 @@ builds:
       - -X github.com/certwatch-app/cw-agent/internal/version.GitCommit={{.ShortCommit}}
       - -X github.com/certwatch-app/cw-agent/internal/version.BuildDate={{.Date}}
 
+  # Kubernetes cert-manager controller - Linux only (K8s)
+  - id: cw-agent-certmanager
+    main: ./cmd/cw-agent-certmanager
+    binary: cw-agent-certmanager
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/certwatch-app/cw-agent/internal/version.Version={{.Version}}
+      - -X github.com/certwatch-app/cw-agent/internal/version.GitCommit={{.ShortCommit}}
+      - -X github.com/certwatch-app/cw-agent/internal/version.BuildDate={{.Date}}
+
 archives:
+  # Only archive cw-agent (certmanager is K8s-only, distributed via Docker)
   - id: default
+    builds:
+      - cw-agent
     formats:
       - tar.gz
     format_overrides:
@@ -76,31 +97,62 @@ release:
   name_template: "v{{.Version}}"
 
 dockers:
-  - image_templates:
+  # ============================================================
+  # cw-agent Docker images
+  # ============================================================
+  - id: cw-agent-amd64
+    ids:
+      - cw-agent
+    image_templates:
       - "ghcr.io/certwatch-app/cw-agent:{{ .Version }}-amd64"
     use: buildx
     build_flag_templates:
       - "--platform=linux/amd64"
-      - "--build-arg=VERSION={{.Version}}"
-      - "--build-arg=GIT_COMMIT={{.ShortCommit}}"
-      - "--build-arg=BUILD_DATE={{.Date}}"
     dockerfile: Dockerfile
     goos: linux
     goarch: amd64
 
-  - image_templates:
+  - id: cw-agent-arm64
+    ids:
+      - cw-agent
+    image_templates:
       - "ghcr.io/certwatch-app/cw-agent:{{ .Version }}-arm64"
     use: buildx
     build_flag_templates:
       - "--platform=linux/arm64"
-      - "--build-arg=VERSION={{.Version}}"
-      - "--build-arg=GIT_COMMIT={{.ShortCommit}}"
-      - "--build-arg=BUILD_DATE={{.Date}}"
     dockerfile: Dockerfile
     goos: linux
     goarch: arm64
 
+  # ============================================================
+  # cw-agent-certmanager Docker images (Kubernetes controller)
+  # ============================================================
+  - id: cw-agent-certmanager-amd64
+    ids:
+      - cw-agent-certmanager
+    image_templates:
+      - "ghcr.io/certwatch-app/cw-agent-certmanager:{{ .Version }}-amd64"
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+    dockerfile: Dockerfile.certmanager
+    goos: linux
+    goarch: amd64
+
+  - id: cw-agent-certmanager-arm64
+    ids:
+      - cw-agent-certmanager
+    image_templates:
+      - "ghcr.io/certwatch-app/cw-agent-certmanager:{{ .Version }}-arm64"
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/arm64"
+    dockerfile: Dockerfile.certmanager
+    goos: linux
+    goarch: arm64
+
 docker_manifests:
+  # cw-agent multi-arch manifests
   - name_template: "ghcr.io/certwatch-app/cw-agent:{{ .Version }}"
     image_templates:
       - "ghcr.io/certwatch-app/cw-agent:{{ .Version }}-amd64"
@@ -111,11 +163,25 @@ docker_manifests:
       - "ghcr.io/certwatch-app/cw-agent:{{ .Version }}-amd64"
       - "ghcr.io/certwatch-app/cw-agent:{{ .Version }}-arm64"
 
+  # cw-agent-certmanager multi-arch manifests
+  - name_template: "ghcr.io/certwatch-app/cw-agent-certmanager:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/certwatch-app/cw-agent-certmanager:{{ .Version }}-amd64"
+      - "ghcr.io/certwatch-app/cw-agent-certmanager:{{ .Version }}-arm64"
+
+  - name_template: "ghcr.io/certwatch-app/cw-agent-certmanager:latest"
+    image_templates:
+      - "ghcr.io/certwatch-app/cw-agent-certmanager:{{ .Version }}-amd64"
+      - "ghcr.io/certwatch-app/cw-agent-certmanager:{{ .Version }}-arm64"
+
 brews:
+  # Only cw-agent goes to Homebrew (certmanager is K8s-only)
   - repository:
       owner: certwatch-app
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    ids:
+      - cw-agent
     directory: Formula
     homepage: "https://certwatch.app"
     description: "SSL/TLS certificate monitoring agent for CertWatch"
@@ -126,7 +192,10 @@ brews:
       system "#{bin}/cw-agent", "version"
 
 nfpms:
+  # Only cw-agent gets packaged as deb/rpm (certmanager is K8s-only)
   - id: packages
+    builds:
+      - cw-agent
     package_name: cw-agent
     vendor: CertWatch
     homepage: https://certwatch.app

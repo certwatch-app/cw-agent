@@ -1,0 +1,161 @@
+# Default values for cw-agent-certmanager
+# This is a YAML-formatted file.
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/certwatch-app/cw-agent-certmanager
+  pullPolicy: IfNotPresent
+  # Overrides the image tag (defaults to appVersion)
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# ============================================================
+# CertWatch API Configuration
+# ============================================================
+api:
+  # CertWatch API endpoint (can be overridden by global.api.endpoint)
+  endpoint: "https://api.certwatch.app"
+  # Request timeout
+  timeout: "30s"
+
+# ============================================================
+# API Key Configuration - REQUIRED
+# ============================================================
+# Choose ONE of the following options:
+#
+# OPTION 1: Direct value (convenient for testing)
+#   helm install ... --set apiKey.value=cw_xxx
+#   WARNING: The key will be stored in Helm release history.
+#
+# OPTION 2: Existing secret (recommended for production)
+#   kubectl create secret generic cw-api-key --from-literal=api-key=cw_xxx
+#   helm install ... --set apiKey.existingSecret.name=cw-api-key
+#
+# OPTION 3: Use global API key from umbrella chart
+#   Automatically used if neither value nor existingSecret is set
+#
+apiKey:
+  # Option 1: Provide API key directly
+  value: ""
+
+  # Option 2: Use an existing Kubernetes Secret
+  existingSecret:
+    name: ""
+    key: "api-key"
+
+# ============================================================
+# Agent Configuration
+# ============================================================
+agent:
+  # Unique name for this agent (required)
+  name: ""
+  # Optional cluster name (defaults to agent.name if not set)
+  clusterName: ""
+  # Log level: debug, info, warn, error
+  logLevel: "info"
+  # Prometheus metrics port
+  metricsPort: 9402
+  # Health check port (liveness/readiness)
+  healthPort: 9403
+  # How often to sync certificate data to CertWatch cloud
+  syncInterval: "30s"
+  # Heartbeat interval for offline detection
+  heartbeatInterval: "30s"
+  # Watch certificates in all namespaces
+  watchAllNamespaces: true
+  # If watchAllNamespaces is false, specify namespaces to watch
+  namespaces: []
+    # - default
+    # - production
+
+# ============================================================
+# Kubernetes Resources
+# ============================================================
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use
+  name: ""
+
+# RBAC configuration
+rbac:
+  # Create ClusterRole and ClusterRoleBinding
+  create: true
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  fsGroup: 65534
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 9402
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 128Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+# ============================================================
+# Probes
+# ============================================================
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: health
+  initialDelaySeconds: 15
+  periodSeconds: 20
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: health
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  failureThreshold: 3
+
+# ============================================================
+# Pod Disruption Budget
+# ============================================================
+podDisruptionBudget:
+  enabled: false
+  # minAvailable: 1
+  # maxUnavailable: 0
+
+# ============================================================
+# Prometheus ServiceMonitor (requires Prometheus Operator)
+# ============================================================
+serviceMonitor:
+  enabled: false
+  namespace: ""
+  interval: "30s"
+  labels: {}
+  namespaceSelector: {}
+
+# ============================================================
+# Scheduling
+# ============================================================
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

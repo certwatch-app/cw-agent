@@ -63,6 +63,10 @@ func initConfig() {
 	viper.SetEnvPrefix("CW")
 	viper.AutomaticEnv()
 
+	// Explicitly bind API key from environment variable
+	//nolint:errcheck // BindEnv always succeeds when args are valid
+	viper.BindEnv("api.key", "CW_API_KEY")
+
 	// If a config file is found, read it in
 	if err := viper.ReadInConfig(); err == nil {
 		if verbose {

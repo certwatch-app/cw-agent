@@ -37,3 +37,7 @@ dist/
 
 # GoReleaser
 /dist/
+
+# Helm packages
+*.tgz
+charts/*.tgz

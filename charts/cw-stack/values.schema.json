@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "title": "CertWatch Stack Values",
+  "description": "Configuration values for the cw-stack umbrella Helm chart",
+  "properties": {
+    "global": {
+      "type": "object",
+      "description": "Global values shared by all subcharts",
+      "properties": {
+        "api": {
+          "type": "object",
+          "description": "CertWatch API configuration",
+          "properties": {
+            "endpoint": {
+              "type": "string",
+              "format": "uri",
+              "default": "https://api.certwatch.app",
+              "description": "CertWatch API endpoint URL"
+            },
+            "timeout": {
+              "type": "string",
+              "pattern": "^[0-9]+(s|m|h)$",
+              "default": "30s",
+              "description": "API request timeout (e.g., 30s, 1m)"
+            }
+          }
+        },
+        "apiKey": {
+          "type": "object",
+          "description": "API key configuration shared by all agents",
+          "properties": {
+            "value": {
+              "type": "string",
+              "description": "API key value (use existingSecret in production)"
+            },
+            "existingSecret": {
+              "type": "object",
+              "description": "Reference to existing Kubernetes Secret",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of existing secret containing API key"
+                },
+                "key": {
+                  "type": "string",
+                  "default": "api-key",
+                  "description": "Key within the secret"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "description": "Network scanner agent (cw-agent) configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable the network scanner agent"
+        }
+      }
+    },
+    "certManager": {
+      "type": "object",
+      "description": "cert-manager controller agent (cw-agent-certmanager) configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable the cert-manager controller agent"
+        }
+      }
+    },
+    "cw-agent": {
+      "type": "object",
+      "description": "Values passed to cw-agent subchart. See charts/cw-agent/values.yaml for all options.",
+      "properties": {
+        "agent": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Agent name (required when agent.enabled=true)"
+            }
+          }
+        },
+        "apiKey": {
+          "type": "object",
+          "description": "Override global API key for this agent"
+        }
+      }
+    },
+    "cw-agent-certmanager": {
+      "type": "object",
+      "description": "Values passed to cw-agent-certmanager subchart. See charts/cw-agent-certmanager/values.yaml for all options.",
+      "properties": {
+        "agent": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Agent name (required when certManager.enabled=true)"
+            }
+          }
+        },
+        "apiKey": {
+          "type": "object",
+          "description": "Override global API key for this agent"
+        }
+      }
+    }
+  }
+}

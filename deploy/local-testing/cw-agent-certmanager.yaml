@@ -1,0 +1,206 @@
+# CertWatch Agent for cert-manager - Kubernetes deployment
+# Deploy the cw-agent-certmanager controller to watch certificates
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: certwatch
+  labels:
+    app.kubernetes.io/name: certwatch
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cw-agent-certmanager-config
+  namespace: certwatch
+data:
+  certwatch.yaml: |
+    api:
+      endpoint: "https://api.certwatch.app"
+      key: "cw_a386593c_TestKeY"
+      timeout: 30s
+
+    agent:
+      name: "local-test-cluster"
+      cluster_name: "certwatch-test"
+      log_level: "debug"
+      metrics_port: 9402
+      sync_interval: 30s
+      heartbeat_interval: 30s
+      watch_all_namespaces: true
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cw-agent-certmanager-secret
+  namespace: certwatch
+type: Opaque
+stringData:
+  # Replace with your actual API key (must match format: cw_<prefix>_<secret>)
+  api-key: "cw_a386593c_TestKeY"
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cw-agent-certmanager
+  namespace: certwatch
+
+---
+# ClusterRole for watching cert-manager certificates
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cw-agent-certmanager
+rules:
+  # cert-manager Certificate resources
+  - apiGroups: ["cert-manager.io"]
+    resources: ["certificates", "certificaterequests", "issuers", "clusterissuers"]
+    verbs: ["get", "list", "watch"]
+  # Secrets for certificate data
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+  # Events for debugging
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+  # Namespaces for filtering
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cw-agent-certmanager
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cw-agent-certmanager
+subjects:
+  - kind: ServiceAccount
+    name: cw-agent-certmanager
+    namespace: certwatch
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cw-agent-certmanager
+  namespace: certwatch
+  labels:
+    app: cw-agent-certmanager
+    app.kubernetes.io/name: cw-agent-certmanager
+    app.kubernetes.io/component: controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cw-agent-certmanager
+  template:
+    metadata:
+      labels:
+        app: cw-agent-certmanager
+        app.kubernetes.io/name: cw-agent-certmanager
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9402"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: cw-agent-certmanager
+      containers:
+        - name: controller
+          # Use local image for testing
+          image: cw-agent-certmanager:dev
+          imagePullPolicy: Never  # Use local image
+          args:
+            - "-c"
+            - "/etc/certwatch/certwatch.yaml"
+          ports:
+            - name: metrics
+              containerPort: 9402
+              protocol: TCP
+            - name: health
+              containerPort: 9403
+              protocol: TCP
+          env:
+            - name: CW_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cw-agent-certmanager-secret
+                  key: api-key
+          resources:
+            limits:
+              cpu: 200m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 9403
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 9403
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: config
+              mountPath: /etc/certwatch
+              readOnly: true
+            - name: state
+              mountPath: /var/lib/certwatch
+      volumes:
+        - name: config
+          configMap:
+            name: cw-agent-certmanager-config
+        - name: state
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cw-agent-certmanager
+  namespace: certwatch
+  labels:
+    app: cw-agent-certmanager
+spec:
+  type: NodePort
+  selector:
+    app: cw-agent-certmanager
+  ports:
+    - name: metrics
+      port: 9402
+      targetPort: 9402
+      nodePort: 30402
+
+---
+# ServiceMonitor for Prometheus Operator
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cw-agent-certmanager
+  namespace: certwatch
+  labels:
+    app: cw-agent-certmanager
+    release: prometheus  # Match Prometheus Operator release
+spec:
+  selector:
+    matchLabels:
+      app: cw-agent-certmanager
+  endpoints:
+    - port: metrics
+      interval: 15s
+      path: /metrics
+  namespaceSelector:
+    matchNames:
+      - certwatch

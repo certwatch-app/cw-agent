@@ -1,0 +1,395 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "title": "CertWatch Agent Values",
+  "description": "Configuration values for the cw-agent Helm chart",
+  "properties": {
+    "global": {
+      "type": "object",
+      "description": "Global values shared across umbrella chart subcharts",
+      "properties": {
+        "api": {
+          "type": "object",
+          "properties": {
+            "endpoint": {
+              "type": "string",
+              "format": "uri",
+              "description": "CertWatch API endpoint URL"
+            },
+            "timeout": {
+              "type": "string",
+              "pattern": "^[0-9]+(s|m|h)$",
+              "description": "API request timeout (e.g., 30s, 1m)"
+            }
+          }
+        },
+        "apiKey": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "description": "API key value (use existingSecret in production)"
+            },
+            "existingSecret": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of existing secret containing API key"
+                },
+                "key": {
+                  "type": "string",
+                  "description": "Key within the secret"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1,
+      "description": "Number of replicas"
+    },
+    "image": {
+      "type": "object",
+      "description": "Container image configuration",
+      "properties": {
+        "repository": {
+          "type": "string",
+          "description": "Container image repository"
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": ["Always", "IfNotPresent", "Never"],
+          "description": "Image pull policy"
+        },
+        "tag": {
+          "type": "string",
+          "description": "Image tag (defaults to appVersion)"
+        }
+      },
+      "required": ["repository"]
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "description": "Image pull secrets for private registries",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": ["name"]
+      }
+    },
+    "nameOverride": {
+      "type": "string",
+      "description": "Override the chart name"
+    },
+    "fullnameOverride": {
+      "type": "string",
+      "description": "Override the full resource name"
+    },
+    "api": {
+      "type": "object",
+      "description": "CertWatch API configuration",
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "format": "uri",
+          "description": "API endpoint URL"
+        },
+        "timeout": {
+          "type": "string",
+          "pattern": "^[0-9]+(s|m|h)$",
+          "description": "API request timeout"
+        }
+      }
+    },
+    "apiKey": {
+      "type": "object",
+      "description": "API key configuration",
+      "properties": {
+        "value": {
+          "type": "string",
+          "description": "API key value (use existingSecret in production)"
+        },
+        "existingSecret": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Name of existing secret containing API key"
+            },
+            "key": {
+              "type": "string",
+              "default": "api-key",
+              "description": "Key within the secret"
+            }
+          }
+        }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "description": "Agent configuration",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Agent name (REQUIRED) - identifies this agent in CertWatch"
+        },
+        "logLevel": {
+          "type": "string",
+          "enum": ["debug", "info", "warn", "error"],
+          "default": "info",
+          "description": "Log verbosity level"
+        },
+        "syncInterval": {
+          "type": "string",
+          "pattern": "^[0-9]+(s|m|h)$",
+          "default": "5m",
+          "description": "How often to sync with CertWatch cloud"
+        },
+        "scanInterval": {
+          "type": "string",
+          "pattern": "^[0-9]+(s|m|h)$",
+          "default": "1m",
+          "description": "How often to scan certificates locally"
+        },
+        "concurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 10,
+          "description": "Maximum concurrent certificate scans"
+        },
+        "heartbeatInterval": {
+          "type": "string",
+          "pattern": "^[0-9]+(s|m|h)$",
+          "default": "30s",
+          "description": "Heartbeat interval for offline alerts (0 to disable)"
+        },
+        "metricsPort": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535,
+          "default": 8080,
+          "description": "Prometheus metrics port (0 to disable)"
+        }
+      },
+      "required": ["name"]
+    },
+    "certificates": {
+      "type": "array",
+      "description": "Certificates to monitor",
+      "items": {
+        "type": "object",
+        "properties": {
+          "hostname": {
+            "type": "string",
+            "description": "Hostname to monitor"
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535,
+            "default": 443,
+            "description": "Port to connect to"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Tags for categorization"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Optional notes"
+          }
+        },
+        "required": ["hostname"]
+      }
+    },
+    "existingConfigMap": {
+      "type": "object",
+      "description": "Use existing ConfigMap for configuration",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of existing ConfigMap"
+        },
+        "key": {
+          "type": "string",
+          "default": "certwatch.yaml",
+          "description": "Key containing the certwatch.yaml content"
+        }
+      }
+    },
+    "serviceAccount": {
+      "type": "object",
+      "description": "ServiceAccount configuration",
+      "properties": {
+        "create": {
+          "type": "boolean",
+          "default": true,
+          "description": "Create a ServiceAccount"
+        },
+        "name": {
+          "type": "string",
+          "description": "ServiceAccount name (auto-generated if not set)"
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "ServiceAccount annotations"
+        }
+      }
+    },
+    "podAnnotations": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Annotations for the pod"
+    },
+    "podSecurityContext": {
+      "type": "object",
+      "description": "Pod security context"
+    },
+    "securityContext": {
+      "type": "object",
+      "description": "Container security context"
+    },
+    "service": {
+      "type": "object",
+      "description": "Service configuration",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ClusterIP", "NodePort", "LoadBalancer"],
+          "default": "ClusterIP"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 8080
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "description": "Container resource requests and limits",
+      "properties": {
+        "limits": {
+          "type": "object",
+          "properties": {
+            "cpu": {
+              "type": "string"
+            },
+            "memory": {
+              "type": "string"
+            }
+          }
+        },
+        "requests": {
+          "type": "object",
+          "properties": {
+            "cpu": {
+              "type": "string"
+            },
+            "memory": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "livenessProbe": {
+      "type": "object",
+      "description": "Liveness probe configuration"
+    },
+    "readinessProbe": {
+      "type": "object",
+      "description": "Readiness probe configuration"
+    },
+    "serviceMonitor": {
+      "type": "object",
+      "description": "Prometheus ServiceMonitor configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Create a ServiceMonitor for Prometheus Operator"
+        },
+        "namespace": {
+          "type": "string",
+          "description": "Namespace for ServiceMonitor (defaults to release namespace)"
+        },
+        "interval": {
+          "type": "string",
+          "pattern": "^[0-9]+(s|m)$",
+          "description": "Scrape interval"
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Additional labels for ServiceMonitor"
+        }
+      }
+    },
+    "podDisruptionBudget": {
+      "type": "object",
+      "description": "PodDisruptionBudget configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Create a PodDisruptionBudget"
+        },
+        "minAvailable": {
+          "oneOf": [
+            {"type": "integer", "minimum": 0},
+            {"type": "string", "pattern": "^[0-9]+%$"}
+          ],
+          "description": "Minimum available pods (number or percentage)"
+        },
+        "maxUnavailable": {
+          "oneOf": [
+            {"type": "integer", "minimum": 0},
+            {"type": "string", "pattern": "^[0-9]+%$"}
+          ],
+          "description": "Maximum unavailable pods (number or percentage)"
+        }
+      }
+    },
+    "nodeSelector": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Node selector for pod scheduling"
+    },
+    "tolerations": {
+      "type": "array",
+      "description": "Tolerations for pod scheduling",
+      "items": {
+        "type": "object"
+      }
+    },
+    "affinity": {
+      "type": "object",
+      "description": "Affinity rules for pod scheduling"
+    }
+  },
+  "required": ["image"]
+}

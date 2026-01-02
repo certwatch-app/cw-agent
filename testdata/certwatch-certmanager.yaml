@@ -1,0 +1,36 @@
+# CertWatch cert-manager controller configuration
+# This file is used for local testing and development
+
+api:
+  endpoint: "https://api.certwatch.app"
+  key: "${CW_API_KEY}"  # Set via environment variable
+  timeout: 30s
+
+agent:
+  # Unique name for this agent/cluster
+  name: "test-cluster"
+
+  # Optional: override cluster name (defaults to agent.name)
+  # cluster_name: "my-kubernetes-cluster"
+
+  # Logging level: debug, info, warn, error
+  log_level: "debug"
+
+  # Port for Prometheus metrics (default: 9402)
+  # Health endpoints are on port+1 (9403)
+  metrics_port: 9402
+
+  # How often to sync certificate data to CertWatch cloud
+  sync_interval: 30s
+
+  # How often to send heartbeats for offline detection
+  heartbeat_interval: 30s
+
+  # Watch all namespaces (default: true)
+  watch_all_namespaces: true
+
+  # If watch_all_namespaces is false, specify which namespaces to watch
+  # namespaces:
+  #   - default
+  #   - cert-manager
+  #   - production

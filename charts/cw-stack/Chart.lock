@@ -1,0 +1,9 @@
+dependencies:
+- name: cw-agent
+  repository: file://../cw-agent
+  version: 0.5.0
+- name: cw-agent-certmanager
+  repository: file://../cw-agent-certmanager
+  version: 0.5.0
+digest: sha256:e5b24f4632aef3d8468c7b047ee3d93b512b7d65a5b3975b72aaf375f6922019
+generated: "2026-01-01T23:13:09.6459419+05:30"

@@ -1,0 +1,74 @@
+# Default values for cw-stack umbrella chart
+# This chart deploys CertWatch agents as optional subcharts
+
+# ============================================================
+# Global Configuration
+# ============================================================
+# These values are available to all subcharts via .Values.global
+global:
+  # CertWatch API configuration (shared by all agents)
+  api:
+    # CertWatch API endpoint
+    endpoint: "https://api.certwatch.app"
+    # Request timeout
+    timeout: "30s"
+
+  # API Key configuration - shared by all agents
+  # Each agent can override this with their own apiKey settings
+  apiKey:
+    # Option 1: Provide API key directly (Helm will create Secrets)
+    # WARNING: Not recommended for production - visible in Helm history
+    value: ""
+
+    # Option 2: Use an existing Kubernetes Secret (recommended)
+    existingSecret:
+      # Name of the existing secret containing the API key
+      name: ""
+      # Key within the secret that contains the API key
+      key: "api-key"
+
+# ============================================================
+# Network Scanner Agent (cw-agent)
+# ============================================================
+# Scans TLS certificates from network endpoints
+agent:
+  # Enable the network scanner agent
+  enabled: false
+
+# ============================================================
+# cert-manager Controller Agent (cw-agent-certmanager)
+# ============================================================
+# Monitors certificates managed by cert-manager in Kubernetes
+certManager:
+  # Enable the cert-manager controller agent
+  enabled: false
+
+# ============================================================
+# Subchart Value Overrides
+# ============================================================
+# Values under these keys are passed directly to subcharts.
+# Use chart alias as the key (matches dependencies in Chart.yaml)
+
+# cw-agent subchart values
+# See charts/cw-agent/values.yaml for all options
+cw-agent:
+  # Agent name is required - identifies this agent in CertWatch
+  agent:
+    name: ""
+  # Override global API key for this agent only
+  # apiKey:
+  #   value: ""
+  #   existingSecret:
+  #     name: ""
+
+# cw-agent-certmanager subchart values
+# See charts/cw-agent-certmanager/values.yaml for all options
+cw-agent-certmanager:
+  # Agent name is required - identifies this agent in CertWatch
+  agent:
+    name: ""
+  # Override global API key for this agent only
+  # apiKey:
+  #   value: ""
+  #   existingSecret:
+  #     name: ""

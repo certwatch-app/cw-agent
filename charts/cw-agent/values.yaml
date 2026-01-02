@@ -160,6 +160,17 @@ serviceMonitor:
   labels: {}
 
 # ============================================================
+# Pod Disruption Budget
+# ============================================================
+podDisruptionBudget:
+  # Create a PodDisruptionBudget
+  enabled: false
+  # Minimum available pods (number or percentage like "50%")
+  # minAvailable: 1
+  # Maximum unavailable pods (number or percentage)
+  # maxUnavailable: 1
+
+# ============================================================
 # Scheduling
 # ============================================================
 nodeSelector: {}

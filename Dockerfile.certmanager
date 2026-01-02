@@ -1,0 +1,16 @@
+# GoReleaser Dockerfile for cw-agent-certmanager
+# Uses pre-built binary from GoReleaser
+# Using base-debian12 which includes CA certificates needed for HTTPS
+FROM gcr.io/distroless/base-debian12:nonroot
+
+# Copy the pre-built binary from GoReleaser
+COPY cw-agent-certmanager /cw-agent-certmanager
+
+# Set user
+USER nonroot:nonroot
+
+# Set entrypoint
+ENTRYPOINT ["/cw-agent-certmanager"]
+
+# Default command
+CMD ["-c", "/etc/certwatch/certwatch.yaml"]

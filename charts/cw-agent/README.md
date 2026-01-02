@@ -1,8 +1,11 @@
 # CertWatch Agent Helm Chart
 
 [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/cw-agent)](https://artifacthub.io/packages/search?repo=cw-agent)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](../../LICENSE)
 
-SSL/TLS certificate monitoring agent for [CertWatch](https://certwatch.app).
+SSL/TLS certificate monitoring agent for [CertWatch](https://certwatch.app). Scans network endpoints for TLS certificates and syncs data to the CertWatch dashboard.
+
+> **Tip:** For deploying multiple CertWatch agents, consider using the [cw-stack](../cw-stack/README.md) umbrella chart.
 
 ## Prerequisites
 
@@ -126,7 +129,7 @@ spec:
   source:
     repoURL: ghcr.io/certwatch-app/helm-charts
     chart: cw-agent
-    targetRevision: 0.4.0
+    targetRevision: 0.5.0
     helm:
       values: |
         agent:
@@ -151,7 +154,7 @@ spec:
   interval: 5m
   url: oci://ghcr.io/certwatch-app/helm-charts/cw-agent
   ref:
-    tag: 0.4.0
+    tag: 0.5.0
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
@@ -219,8 +222,17 @@ helm uninstall cw-agent
 kubectl delete secret cw-agent-api-key  # Optional: remove API key secret
 ```
 
+## Related Charts
+
+- [cw-agent-certmanager](../cw-agent-certmanager/README.md) - Monitor cert-manager certificates
+- [cw-stack](../cw-stack/README.md) - Umbrella chart for deploying both agents
+
 ## Documentation
 
 - [Full Agent Documentation](https://docs.certwatch.app/agent)
 - [GitHub Repository](https://github.com/certwatch-app/cw-agent)
 - [CertWatch Dashboard](https://certwatch.app)
+
+## License
+
+Apache 2.0

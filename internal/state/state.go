@@ -30,11 +30,25 @@ type Manager struct {
 // stateFileName is the name of the state file stored alongside config
 const stateFileName = ".certwatch-state.json"
 
+// DefaultStateDir is the default directory for state storage in containers
+const DefaultStateDir = "/var/lib/certwatch"
+
 // NewManager creates a state manager for the given config file path
 // The state file will be stored in the same directory as the config file
 func NewManager(configPath string) *Manager {
 	dir := filepath.Dir(configPath)
 	statePath := filepath.Join(dir, stateFileName)
+
+	return &Manager{
+		filePath: statePath,
+		state:    &State{},
+	}
+}
+
+// NewManagerWithStateDir creates a state manager with an explicit state directory
+// This is useful when the config is in a read-only location (e.g., ConfigMap mount)
+func NewManagerWithStateDir(stateDir string) *Manager {
+	statePath := filepath.Join(stateDir, stateFileName)
 
 	return &Manager{
 		filePath: statePath,
