@@ -41,3 +41,6 @@ dist/
 # Helm packages
 *.tgz
 charts/*.tgz
+
+# test-certs I maintain locally for testing
+test-certs/

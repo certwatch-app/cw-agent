@@ -103,6 +103,9 @@ func (c *Client) Heartbeat(ctx context.Context, certCount int, lastScan, lastSyn
 	return err
 }
 
+// ErrAgentNotFound is returned when the agent ID is no longer valid on the server
+var ErrAgentNotFound = fmt.Errorf("agent not found")
+
 func (c *Client) doHeartbeatRequest(ctx context.Context, body *HeartbeatRequest) (*HeartbeatResponse, error) {
 	url := c.endpoint + "/api/v1/agent/heartbeat"
 
@@ -129,6 +132,11 @@ func (c *Client) doHeartbeatRequest(ctx context.Context, body *HeartbeatRequest)
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read heartbeat response: %w", err)
+	}
+
+	// Handle 404 - agent was deleted from server
+	if resp.StatusCode == 404 {
+		return nil, ErrAgentNotFound
 	}
 
 	if resp.StatusCode >= 400 {
@@ -279,6 +287,12 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body interf
 // GetAgentID returns the persisted agent ID (empty if not yet synced)
 func (c *Client) GetAgentID() string {
 	return c.stateManager.GetAgentID()
+}
+
+// ClearAgentID removes the stored agent ID (used when agent is deleted from server)
+func (c *Client) ClearAgentID() error {
+	c.stateManager.ClearAgentID()
+	return c.stateManager.Save()
 }
 
 func getHostname() string {

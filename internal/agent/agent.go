@@ -3,6 +3,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -280,6 +281,33 @@ func (a *Agent) sendHeartbeat(ctx context.Context) error {
 	duration := time.Since(start).Seconds()
 
 	if err != nil {
+		// Check if agent was deleted from server
+		if errors.Is(err, sync.ErrAgentNotFound) {
+			a.logger.Warn("agent not found on server (may have been deleted), re-registering")
+
+			// Clear the stale agent ID
+			if clearErr := a.client.ClearAgentID(); clearErr != nil {
+				a.logger.Error("failed to clear agent ID", zap.Error(clearErr))
+			}
+
+			// Trigger a full re-sync to re-register the agent
+			if syncErr := a.scanAndSync(ctx); syncErr != nil {
+				a.logger.Error("failed to re-register agent", zap.Error(syncErr))
+				metrics.RecordHeartbeatFailure(duration)
+				return fmt.Errorf("agent deleted, re-registration failed: %w", syncErr)
+			}
+
+			a.logger.Info("agent re-registered successfully after deletion",
+				zap.String("new_agent_id", a.stateManager.GetAgentID()),
+			)
+
+			// Update agent info metric with new agent_id
+			metrics.SetAgentInfo(version.GetVersion(), a.config.Agent.Name, a.stateManager.GetAgentID())
+
+			metrics.RecordHeartbeatSuccess(duration)
+			return nil
+		}
+
 		metrics.RecordHeartbeatFailure(duration)
 		return err
 	}

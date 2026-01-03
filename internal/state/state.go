@@ -118,6 +118,13 @@ func (m *Manager) SetAgentID(id string) {
 	m.state.AgentID = id
 }
 
+// ClearAgentID removes the agent ID (used when agent is deleted from server)
+func (m *Manager) ClearAgentID() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.state.AgentID = ""
+}
+
 // GetAgentName returns the persisted agent name
 func (m *Manager) GetAgentName() string {
 	m.mu.RLock()
