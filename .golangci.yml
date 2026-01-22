@@ -1,7 +1,7 @@
 # golangci-lint configuration
 # https://golangci-lint.run/usage/configuration/
 
-version: 2
+version: "2"
 
 run:
   timeout: 5m
@@ -48,6 +48,11 @@ formatters:
   enable:
     - gofmt
     - goimports
+  settings:
+    gofmt:
+      simplify: true
+    goimports:
+      local-prefixes: github.com/certwatch-app/cw-agent
 
 linters-settings:
   errcheck:
@@ -78,13 +83,6 @@ linters-settings:
       - performance
     disabled-checks:
       - hugeParam
-
-formatters-settings:
-  gofmt:
-    simplify: true
-
-  goimports:
-    local-prefixes: github.com/certwatch-app/cw-agent
 
 issues:
   max-issues-per-linter: 50

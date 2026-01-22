@@ -109,6 +109,7 @@ func (s *PKCS12Source) getPassword() (string, error) {
 			return "", fmt.Errorf("environment variable %s is empty or not set", s.passwordEnv)
 		}
 		// Log only the variable name, never the password value
+		// codeql[go/clear-text-logging] Logging env var name (not the password value) for debugging
 		s.logger.Debug("Retrieved password from environment variable",
 			zap.String("env_var", s.passwordEnv))
 		return password, nil
@@ -128,6 +129,7 @@ func (s *PKCS12Source) getPassword() (string, error) {
 		if password == "" {
 			return "", fmt.Errorf("password file is empty: %s", s.passwordFile)
 		}
+		// codeql[go/clear-text-logging] Logging file path (not the password contents) for debugging
 		s.logger.Debug("Retrieved password from password file",
 			zap.String("password_file", s.passwordFile))
 		return password, nil

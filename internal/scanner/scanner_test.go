@@ -7,6 +7,7 @@ import (
 
 	"github.com/certwatch-app/cw-agent/internal/ca"
 	"github.com/certwatch-app/cw-agent/internal/config"
+
 	"go.uber.org/zap/zaptest"
 )
 

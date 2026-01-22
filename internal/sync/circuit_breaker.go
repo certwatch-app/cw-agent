@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/certwatch-app/cw-agent/internal/metrics"
+
 	"go.uber.org/zap"
 )
 
