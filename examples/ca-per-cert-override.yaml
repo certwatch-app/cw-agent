@@ -1,0 +1,49 @@
+# Example: Per-Certificate CA Override
+# This configuration shows how to override CA settings for specific certificates.
+
+api:
+  endpoint: "https://api.certwatch.app"
+  key: "cw_xxxxxxxx_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  timeout: 30s
+
+agent:
+  name: "mixed-monitor"
+  sync_interval: 5m
+  scan_interval: 1m
+  concurrency: 10
+  log_level: info
+
+# Global CA Configuration (default for all certificates)
+ca:
+  trust_mode: "system"      # Default: use system CAs
+  validation_mode: "chain"  # Default: full validation
+
+certificates:
+  # Use global CA config (system CAs)
+  - hostname: "www.google.com"
+    port: 443
+    tags:
+      - external
+    notes: "Uses global system CA config"
+
+  # Override with custom CA for this specific certificate
+  - hostname: "internal-api.corp"
+    port: 443
+    tags:
+      - internal
+    notes: "Uses custom CA override"
+    ca:
+      trust_mode: "custom"
+      validation_mode: "chain"
+      ca_bundles:
+        - "/etc/ssl/certs/internal-corp-ca.pem"
+
+  # Override to disable validation for self-signed cert
+  - hostname: "test-server.local"
+    port: 8443
+    tags:
+      - testing
+      - self-signed
+    notes: "Self-signed certificate - validation disabled"
+    ca:
+      validation_mode: "none"  # Skip CA validation

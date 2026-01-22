@@ -1,0 +1,47 @@
+# Example: Different Validation Modes
+# This configuration demonstrates all three validation modes.
+
+api:
+  endpoint: "https://api.certwatch.app"
+  key: "cw_xxxxxxxx_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  timeout: 30s
+
+agent:
+  name: "validation-demo"
+  sync_interval: 5m
+  scan_interval: 1m
+  concurrency: 10
+  log_level: info
+
+# Global CA Configuration
+ca:
+  trust_mode: "system"
+  validation_mode: "chain"  # Default: full validation
+
+certificates:
+  # validation_mode: "chain" - Full x509.Verify chain validation
+  - hostname: "www.google.com"
+    port: 443
+    tags:
+      - production
+    notes: "Full chain validation (default)"
+
+  # validation_mode: "basic" - Basic validation without hostname check
+  - hostname: "wildcard-cert.example.com"
+    port: 443
+    tags:
+      - production
+    notes: "Basic validation (no hostname check)"
+    ca:
+      trust_mode: "system"
+      validation_mode: "basic"
+
+  # validation_mode: "none" - Skip CA validation entirely
+  - hostname: "self-signed.local"
+    port: 443
+    tags:
+      - development
+      - self-signed
+    notes: "No CA validation (self-signed OK)"
+    ca:
+      validation_mode: "none"

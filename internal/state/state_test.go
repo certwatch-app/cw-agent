@@ -313,6 +313,7 @@ func TestStateFileFormat(t *testing.T) {
 
 	// Read raw file and verify JSON structure
 	statePath := filepath.Join(tmpDir, stateFileName)
+	//nolint:gosec // G304: Test file reading from test temp directory, path is safe
 	data, err := os.ReadFile(statePath)
 	if err != nil {
 		t.Fatalf("failed to read state file: %v", err)

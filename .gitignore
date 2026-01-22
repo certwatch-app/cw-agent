@@ -44,3 +44,6 @@ charts/*.tgz
 
 # test-certs I maintain locally for testing
 test-certs/
+
+# envtest binaries (controller-runtime testing)
+testdata/envtest/

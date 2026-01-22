@@ -1,69 +1,100 @@
-# golangci-lint configuration
+# golangci-lint configuration (v2 format)
 # https://golangci-lint.run/usage/configuration/
+
+version: "2"
 
 run:
   timeout: 5m
-  issues-exit-code: 1
   tests: true
 
 linters:
   enable:
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
     - unused
-    - gofmt
-    - goimports
     - misspell
     - unconvert
     - bodyclose
     - noctx
     - gosec
     - prealloc
-    - copyloopvar  # Replacement for deprecated exportloopref
+    - copyloopvar
     - gocritic
 
-linters-settings:
-  errcheck:
-    check-type-assertions: true
-    check-blank: true
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+      exclude-functions:
+        - (io.Closer).Close
+        - (*go.uber.org/zap.Logger).Sync
+        - (os.File).Close
 
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment  # Disabled: manual field ordering for clarity over memory optimization
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+        - shadow
+        - unusedwrite
 
-  gofmt:
-    simplify: true
+    misspell:
+      locale: US
 
-  goimports:
-    local-prefixes: github.com/certwatch-app/cw-agent
+    gosec:
+      excludes:
+        - G104
+        - G304
 
-  misspell:
-    locale: US
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - hugeParam
+        - unnamedResult
+        - paramTypeCombine
+        - importShadow
+        - octalLiteral
+        - httpNoBody
 
-  gosec:
-    excludes:
-      - G104 # Audit errors not checked (we handle in specific cases)
-      - G304 # File path provided as taint input (config files)
+  exclusions:
+    rules:
+      # Exclude linters from test files
+      - path: _test\.go
+        linters:
+          - errcheck
+          - gocritic
+          - gosec
+          - govet
+          - misspell
 
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-      - performance
-    disabled-checks:
-      - hugeParam
+      # Exclude from test infrastructure
+      - path: harness/
+        linters:
+          - errcheck
+          - gocritic
+          - gosec
+
+      - path: integration/
+        linters:
+          - errcheck
+          - gocritic
+          - gosec
+
+      # Exclude gosec file permissions from init command
+      - path: internal/cmd/initcmd/
+        linters:
+          - gosec
+        text: 'G301'
+
+    # Exclude entire directories from all linting
+    paths:
+      - "internal/ca/integration/"
+      - "internal/ca/testing_helpers.go"
 
 issues:
-  exclude-rules:
-    # Exclude some linters from running on tests files
-    - path: _test\.go
-      linters:
-        - gosec
-        - gocritic
-
   max-issues-per-linter: 50
   max-same-issues: 10

@@ -2,16 +2,20 @@ package sync
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 
 	"github.com/certwatch-app/cw-agent/internal/config"
+	"github.com/certwatch-app/cw-agent/internal/metrics"
 	"github.com/certwatch-app/cw-agent/internal/scanner"
 	"github.com/certwatch-app/cw-agent/internal/state"
 	"github.com/certwatch-app/cw-agent/internal/version"
@@ -26,51 +30,212 @@ type Client struct {
 	agentName         string
 	stateManager      *state.Manager
 	heartbeatInterval time.Duration
+	retryConfig       config.RetryConfig
+	circuitBreaker    *CircuitBreaker
 }
 
 // New creates a new sync Client with state manager for agent ID persistence
 func New(cfg *config.Config, logger *zap.Logger, stateManager *state.Manager) *Client {
-	return &Client{
+	client := &Client{
 		endpoint:          cfg.API.Endpoint,
 		apiKey:            cfg.API.Key,
 		agentName:         cfg.Agent.Name,
 		stateManager:      stateManager,
 		heartbeatInterval: cfg.Agent.HeartbeatInterval,
+		retryConfig:       cfg.API.Retry,
 		httpClient: &http.Client{
 			Timeout: cfg.API.Timeout,
 		},
 		logger: logger,
 	}
+
+	// Initialize circuit breaker if enabled
+	if cfg.API.CircuitBreaker.Enabled {
+		client.circuitBreaker = NewCircuitBreaker(
+			cfg.API.CircuitBreaker.MaxFailures,
+			cfg.API.CircuitBreaker.Timeout,
+			logger.With(zap.String("component", "circuit_breaker")),
+		)
+	}
+
+	return client
 }
 
-// Sync sends certificate data to the CertWatch API
+// Sync sends certificate data to the CertWatch API with retry logic and circuit breaker
 func (c *Client) Sync(ctx context.Context, certs []config.CertificateConfig, results []scanner.ScanResult) (*SyncResponse, error) {
+	// Wrap with circuit breaker if enabled
+	if c.circuitBreaker != nil {
+		var resp *SyncResponse
+		err := c.circuitBreaker.Call(ctx, func() error {
+			var syncErr error
+			if c.retryConfig.MaxRetries > 0 {
+				resp, syncErr = c.syncWithRetry(ctx, certs, results)
+			} else {
+				resp, syncErr = c.syncInternal(ctx, certs, results)
+			}
+			return syncErr
+		})
+		return resp, err
+	}
+
+	// No circuit breaker - use retry logic if configured
+	if c.retryConfig.MaxRetries > 0 {
+		return c.syncWithRetry(ctx, certs, results)
+	}
+
+	return c.syncInternal(ctx, certs, results)
+}
+
+// syncInternal performs a single sync operation without retry or circuit breaker
+func (c *Client) syncInternal(ctx context.Context, certs []config.CertificateConfig, results []scanner.ScanResult) (*SyncResponse, error) {
+	startTime := time.Now()
+
+	// Generate correlation ID for request tracking
+	correlationID := uuid.New().String()
+
+	c.logger.Info("starting sync",
+		zap.String("correlation_id", correlationID),
+		zap.Int("certificate_count", len(certs)),
+		zap.String("agent_id", c.stateManager.GetAgentID()),
+	)
+
 	// Build request payload
 	req := c.buildSyncRequest(certs, results)
 
-	// Send request
-	resp, err := c.doRequest(ctx, "POST", "/api/v1/agent/sync", req)
+	// Send request with correlation ID
+	resp, err := c.doRequestWithCorrelation(ctx, "POST", "/api/v1/agent/sync", req, correlationID)
 	if err != nil {
+		c.logger.Error("sync failed",
+			zap.String("correlation_id", correlationID),
+			zap.Duration("duration", time.Since(startTime)),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
 	// Persist agent ID and name for future restarts
 	if resp.Success && resp.AgentID != "" {
-		c.stateManager.SetAgentID(resp.AgentID)
-		c.stateManager.SetAgentName(c.agentName)
-		c.stateManager.SetLastSyncAt(resp.Data.SyncedAt)
+		c.persistAgentState(resp)
+	}
 
-		// Clear previous agent ID after successful migration
-		if c.stateManager.GetPreviousAgentID() != "" && resp.Data.Migrated > 0 {
-			c.stateManager.ClearPreviousAgentID()
+	duration := time.Since(startTime).Seconds()
+
+	// Record metrics
+	metrics.RecordSyncSuccess(duration, resp.Data.Created, resp.Data.Updated, resp.Data.Orphaned)
+
+	c.logger.Info("sync completed",
+		zap.String("correlation_id", correlationID),
+		zap.String("agent_id", resp.AgentID),
+		zap.Int("created", resp.Data.Created),
+		zap.Int("updated", resp.Data.Updated),
+		zap.Int("unchanged", resp.Data.Unchanged),
+		zap.Duration("duration", time.Since(startTime)),
+	)
+
+	return resp, nil
+}
+
+// syncWithRetry sends certificate data with exponential backoff retry logic
+func (c *Client) syncWithRetry(ctx context.Context, certs []config.CertificateConfig, results []scanner.ScanResult) (*SyncResponse, error) {
+	var lastErr error
+	backoff := c.retryConfig.InitialBackoff
+
+	for attempt := 0; attempt <= c.retryConfig.MaxRetries; attempt++ {
+		// Perform sync
+		resp, err := c.syncInternal(ctx, certs, results)
+		if err == nil {
+			return resp, nil
 		}
 
-		if err := c.stateManager.Save(); err != nil {
-			c.logger.Warn("failed to save state", zap.Error(err))
+		lastErr = err
+
+		// Don't retry on client errors (4xx) or context cancellation
+		if isClientError(err) || ctx.Err() != nil {
+			return nil, err
+		}
+
+		// Don't sleep on the last attempt
+		if attempt < c.retryConfig.MaxRetries {
+			// Record retry metric
+			metrics.RecordSyncRetry(attempt + 1)
+
+			// Add jitter to prevent thundering herd
+			//nolint:gosec // G404: math/rand acceptable for retry backoff jitter; not cryptographic use
+			jitter := time.Duration(rand.Float64() * float64(backoff) * 0.1)
+			sleepDuration := backoff + jitter
+
+			c.logger.Warn("sync failed, retrying",
+				zap.Int("attempt", attempt+1),
+				zap.Int("maxRetries", c.retryConfig.MaxRetries),
+				zap.Duration("backoff", sleepDuration),
+				zap.Error(err),
+			)
+
+			// Sleep with context cancellation support
+			select {
+			case <-time.After(sleepDuration):
+				// Continue to next attempt
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+
+			// Exponential backoff with cap
+			backoff = time.Duration(float64(backoff) * c.retryConfig.Multiplier)
+			if backoff > c.retryConfig.MaxBackoff {
+				backoff = c.retryConfig.MaxBackoff
+			}
 		}
 	}
 
-	return resp, nil
+	return nil, fmt.Errorf("sync failed after %d retries: %w", c.retryConfig.MaxRetries, lastErr)
+}
+
+// persistAgentState saves agent ID and related metadata to state
+func (c *Client) persistAgentState(resp *SyncResponse) {
+	c.stateManager.SetAgentID(resp.AgentID)
+	c.stateManager.SetAgentName(c.agentName)
+	c.stateManager.SetLastSyncAt(resp.Data.SyncedAt) // SyncedAt is time.Time
+
+	// Clear previous agent ID after successful migration
+	if c.stateManager.GetPreviousAgentID() != "" && resp.Data.Migrated > 0 {
+		c.stateManager.ClearPreviousAgentID()
+	}
+
+	if err := c.stateManager.Save(); err != nil {
+		c.logger.Warn("failed to save state", zap.Error(err))
+	}
+}
+
+// isClientError returns true for 4xx HTTP errors that should not be retried
+func isClientError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errMsg := err.Error()
+	// Check for common client error status codes
+	return contains(errMsg, "status 400") ||
+		contains(errMsg, "status 401") ||
+		contains(errMsg, "status 403") ||
+		contains(errMsg, "status 404") ||
+		contains(errMsg, "status 409") ||
+		contains(errMsg, "status 422")
+}
+
+// contains checks if a string contains a substring
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
+		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
+			containsMiddle(s, substr)))
+}
+
+func containsMiddle(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
 
 // Heartbeat sends a heartbeat to the CertWatch API
@@ -127,7 +292,7 @@ func (c *Client) doHeartbeatRequest(ctx context.Context, body *HeartbeatRequest)
 	if err != nil {
 		return nil, fmt.Errorf("heartbeat request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // HTTP response body close in defer is idiomatic Go; error indicates broken connection, non-actionable
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -195,6 +360,17 @@ func (c *Client) buildSyncRequest(certs []config.CertificateConfig, results []sc
 							CertificateIndex: issue.CertificateIndex,
 						})
 					}
+
+					// Add CA validation results if available
+					if result.Chain.ValidationMode != "" {
+						data.ValidationMode = result.Chain.ValidationMode
+					}
+					if result.Chain.ValidationError != "" {
+						data.ValidationError = result.Chain.ValidationError
+					}
+					if result.Chain.TrustedRoot != "" {
+						data.TrustedRoot = result.Chain.TrustedRoot
+					}
 				}
 			} else if result.Error != "" {
 				data.LastError = result.Error
@@ -223,16 +399,50 @@ func (c *Client) buildSyncRequest(certs []config.CertificateConfig, results []sc
 	}
 }
 
-func (c *Client) doRequest(ctx context.Context, method, path string, body interface{}) (*SyncResponse, error) {
+// doRequestWithCorrelation sends a request with correlation ID for distributed tracing
+func (c *Client) doRequestWithCorrelation(ctx context.Context, method, path string, body interface{}, correlationID string) (*SyncResponse, error) {
+	return c.doRequestInternal(ctx, method, path, body, correlationID)
+}
+
+func (c *Client) doRequestInternal(ctx context.Context, method, path string, body interface{}, correlationID string) (*SyncResponse, error) {
 	url := c.endpoint + path
 
 	var bodyReader io.Reader
+	compressed := false
+	uncompressedSize := 0
+
 	if body != nil {
 		jsonData, err := json.Marshal(body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal request body: %w", err)
 		}
-		bodyReader = bytes.NewReader(jsonData)
+		uncompressedSize = len(jsonData)
+
+		// Record payload size metric
+		metrics.RecordSyncPayloadSize(uncompressedSize)
+
+		// Compress if payload > 1KB
+		if len(jsonData) > 1024 {
+			var buf bytes.Buffer
+			gzWriter := gzip.NewWriter(&buf)
+			if _, writeErr := gzWriter.Write(jsonData); writeErr == nil {
+				if closeErr := gzWriter.Close(); closeErr == nil {
+					bodyReader = &buf
+					compressed = true
+					c.logger.Debug("compressed request body",
+						zap.Int("uncompressed_bytes", uncompressedSize),
+						zap.Int("compressed_bytes", buf.Len()),
+						zap.Float64("ratio", float64(buf.Len())/float64(uncompressedSize)),
+					)
+				}
+			}
+			// If compression fails, fall back to uncompressed
+			if !compressed {
+				bodyReader = bytes.NewReader(jsonData)
+			}
+		} else {
+			bodyReader = bytes.NewReader(jsonData)
+		}
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
@@ -243,19 +453,41 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body interf
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-API-Key", c.apiKey)
 	req.Header.Set("User-Agent", fmt.Sprintf("cw-agent/%s", version.GetVersion()))
+	req.Header.Set("Accept-Encoding", "gzip") // Tell server we accept gzip responses
+
+	// Add correlation ID for distributed tracing
+	if correlationID != "" {
+		req.Header.Set("X-Correlation-ID", correlationID)
+	}
+
+	if compressed {
+		req.Header.Set("Content-Encoding", "gzip")
+	}
 
 	c.logger.Debug("sending sync request",
 		zap.String("url", url),
 		zap.String("method", method),
+		zap.Bool("compressed", compressed),
 	)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // HTTP response body close in defer is idiomatic Go; error indicates broken connection, non-actionable
 
-	respBody, err := io.ReadAll(resp.Body)
+	// Handle gzip response
+	var reader io.Reader = resp.Body
+	if resp.Header.Get("Content-Encoding") == "gzip" {
+		gzReader, gzErr := gzip.NewReader(resp.Body)
+		if gzErr != nil {
+			return nil, fmt.Errorf("failed to create gzip reader: %w", gzErr)
+		}
+		defer gzReader.Close() //nolint:errcheck // Gzip reader close in defer; response already read, error non-actionable
+		reader = gzReader
+	}
+
+	respBody, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
@@ -263,6 +495,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body interf
 	c.logger.Debug("received response",
 		zap.Int("status", resp.StatusCode),
 		zap.Int("body_length", len(respBody)),
+		zap.Bool("response_compressed", resp.Header.Get("Content-Encoding") == "gzip"),
 	)
 
 	if resp.StatusCode >= 400 {
@@ -282,6 +515,127 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body interf
 	}
 
 	return &syncResp, nil
+}
+
+// MaxCertificatesPerBatch is the maximum number of certificates to sync in a single request
+const MaxCertificatesPerBatch = 100
+
+// AggregatedSyncResponse contains aggregated results from multiple batch syncs
+type AggregatedSyncResponse struct {
+	AgentID        string
+	TotalCreated   int
+	TotalUpdated   int
+	TotalUnchanged int
+	TotalOrphaned  int
+	TotalMigrated  int
+	Errors         []SyncError
+	SyncedAt       time.Time
+}
+
+// SyncInBatches splits certificates into batches and syncs them separately
+// This is useful for large deployments with hundreds of certificates
+func (c *Client) SyncInBatches(ctx context.Context, certs []config.CertificateConfig, results []scanner.ScanResult) (*AggregatedSyncResponse, error) {
+	totalCerts := len(certs)
+	if totalCerts <= MaxCertificatesPerBatch {
+		// No batching needed - use regular sync
+		resp, err := c.Sync(ctx, certs, results)
+		if err != nil {
+			return nil, err
+		}
+		return &AggregatedSyncResponse{
+			AgentID:        resp.AgentID,
+			TotalCreated:   resp.Data.Created,
+			TotalUpdated:   resp.Data.Updated,
+			TotalUnchanged: resp.Data.Unchanged,
+			TotalOrphaned:  resp.Data.Orphaned,
+			TotalMigrated:  resp.Data.Migrated,
+			Errors:         resp.Data.Errors,
+			SyncedAt:       resp.Data.SyncedAt,
+		}, nil
+	}
+
+	batches := (totalCerts + MaxCertificatesPerBatch - 1) / MaxCertificatesPerBatch
+	c.logger.Info("syncing in batches",
+		zap.Int("total_certificates", totalCerts),
+		zap.Int("batch_size", MaxCertificatesPerBatch),
+		zap.Int("num_batches", batches),
+	)
+
+	aggregated := &AggregatedSyncResponse{
+		Errors: []SyncError{},
+	}
+
+	// Build result map for quick lookup
+	resultMap := make(map[string]*scanner.ScanResult)
+	for i := range results {
+		key := fmt.Sprintf("%s:%d", results[i].Hostname, results[i].Port)
+		resultMap[key] = &results[i]
+	}
+
+	for i := 0; i < batches; i++ {
+		start := i * MaxCertificatesPerBatch
+		end := start + MaxCertificatesPerBatch
+		if end > totalCerts {
+			end = totalCerts
+		}
+
+		batch := certs[start:end]
+
+		// Filter results for this batch
+		batchResults := make([]scanner.ScanResult, 0, len(batch))
+		for _, cert := range batch {
+			key := fmt.Sprintf("%s:%d", cert.Hostname, cert.Port)
+			if result, ok := resultMap[key]; ok {
+				batchResults = append(batchResults, *result)
+			}
+		}
+
+		c.logger.Info("syncing batch",
+			zap.Int("batch", i+1),
+			zap.Int("total_batches", batches),
+			zap.Int("batch_size", len(batch)),
+		)
+
+		resp, err := c.Sync(ctx, batch, batchResults)
+		if err != nil {
+			return nil, fmt.Errorf("batch %d/%d failed: %w", i+1, batches, err)
+		}
+
+		// Aggregate results
+		if aggregated.AgentID == "" {
+			aggregated.AgentID = resp.AgentID
+		}
+		aggregated.TotalCreated += resp.Data.Created
+		aggregated.TotalUpdated += resp.Data.Updated
+		aggregated.TotalUnchanged += resp.Data.Unchanged
+		aggregated.TotalMigrated += resp.Data.Migrated
+		aggregated.Errors = append(aggregated.Errors, resp.Data.Errors...)
+		aggregated.SyncedAt = resp.Data.SyncedAt
+
+		// Note: Orphaning only happens on the last batch
+		if i == batches-1 {
+			aggregated.TotalOrphaned = resp.Data.Orphaned
+		}
+
+		// Small delay between batches to avoid overwhelming API
+		if i < batches-1 {
+			select {
+			case <-time.After(100 * time.Millisecond):
+				// Continue
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+	}
+
+	c.logger.Info("batch sync completed",
+		zap.Int("total_created", aggregated.TotalCreated),
+		zap.Int("total_updated", aggregated.TotalUpdated),
+		zap.Int("total_unchanged", aggregated.TotalUnchanged),
+		zap.Int("total_errors", len(aggregated.Errors)),
+	)
+
+	return aggregated, nil
 }
 
 // GetAgentID returns the persisted agent ID (empty if not yet synced)
@@ -365,7 +719,7 @@ func (c *Client) SyncCertManagerCertificates(ctx context.Context, clusterName st
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // HTTP response body close in defer is idiomatic Go; error indicates broken connection, non-actionable
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -444,7 +798,7 @@ func (c *Client) SyncCertManagerEvents(ctx context.Context, clusterName string, 
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // HTTP response body close in defer is idiomatic Go; error indicates broken connection, non-actionable
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -508,7 +862,7 @@ func (c *Client) SyncCertManagerRequests(ctx context.Context, clusterName string
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // HTTP response body close in defer is idiomatic Go; error indicates broken connection, non-actionable
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

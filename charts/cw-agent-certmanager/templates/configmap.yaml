@@ -29,3 +29,19 @@ data:
         {{- end }}
       {{- end }}
       {{- end }}
+
+    {{- if .Values.ca.enabled }}
+    ca:
+      trust_mode: {{ .Values.ca.trustMode | quote }}
+      validation_mode: {{ .Values.ca.validationMode | quote }}
+      auto_reload: {{ .Values.ca.autoReload }}
+      {{- if .Values.ca.sources }}
+      ca_sources:
+        {{- range .Values.ca.sources }}
+        - type: {{ .type | quote }}
+          namespace: {{ .namespace | quote }}
+          name: {{ .name | quote }}
+          key: {{ .key | quote }}
+        {{- end }}
+      {{- end }}
+    {{- end }}

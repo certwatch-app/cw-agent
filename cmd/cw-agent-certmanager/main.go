@@ -125,7 +125,7 @@ func loadConfig() (*config.Config, error) {
 	v.AutomaticEnv()
 
 	// Explicitly bind API key from environment variable
-	//nolint:errcheck // BindEnv always succeeds when args are valid
+	//nolint:errcheck,gosec // BindEnv only fails on programmer error (invalid args)
 	v.BindEnv("api.key", "CW_API_KEY")
 
 	// Load config file if provided

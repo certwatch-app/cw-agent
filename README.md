@@ -23,6 +23,7 @@
 |---------|-------------|
 | **Network Scanning** | Monitor TLS certificates on any reachable endpoint |
 | **cert-manager Integration** | Watch Kubernetes certificates managed by cert-manager |
+| **CA Validation** | Validate certificates against custom/internal CAs, system trust store, or both |
 | **Unified Dashboard** | See all certificates across clusters and environments |
 | **Expiry Alerts** | Get notified before certificates expire |
 | **Prometheus Metrics** | Export certificate metrics for monitoring |
@@ -96,6 +97,7 @@ See [Kubernetes Guide](docs/kubernetes.md) for production deployment instruction
 |-------|-------------|
 | [Getting Started](docs/getting-started.md) | Installation and basic setup |
 | [CLI Reference](docs/cli-reference.md) | All commands and configuration options |
+| [CA Validation](docs/ca-validation.md) | Validate certificates with custom/internal CAs |
 | [Docker Guide](docs/docker.md) | Container deployment with Docker Compose |
 | [Linux Guide](docs/linux.md) | systemd service for local monitoring |
 | [Kubernetes Guide](docs/kubernetes.md) | Helm deployment and GitOps |
@@ -147,6 +149,8 @@ See [certwatch.example.yaml](certwatch.example.yaml) or the [CLI Reference](docs
 |--------|-------------|
 | `certwatch_certificate_days_until_expiry` | Days until certificate expires |
 | `certwatch_certificate_valid` | Certificate validity (1=valid) |
+| `certwatch_certificate_ca_validation` | CA validation status (1=valid, 0=failed) |
+| `certwatch_certificate_trusted_root_info` | Trusted root CA information |
 | `certwatch_scan_total` | Total scans by status |
 | `certwatch_sync_total` | Total syncs by status |
 
