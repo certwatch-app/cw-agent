@@ -488,10 +488,6 @@ func (s *Scanner) parseChainWithCA(certs []*x509.Certificate, hostname string, c
 				Message:          err.Error(),
 				CertificateIndex: 0,
 			})
-			// codeql[go/clear-text-logging] Error logged for debugging; password sources already validated, no secrets in error
-			s.logger.Debug("CA validation failed",
-				zap.String("hostname", hostname),
-				zap.Error(err))
 		}
 	}
 
