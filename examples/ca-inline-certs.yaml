@@ -1,0 +1,43 @@
+# Example: CA Validation with Inline Certificates
+# This configuration uses inline PEM certificates (useful for Kubernetes ConfigMaps).
+
+api:
+  endpoint: "https://api.certwatch.app"
+  key: "cw_xxxxxxxx_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  timeout: 30s
+
+agent:
+  name: "k8s-monitor"
+  sync_interval: 5m
+  scan_interval: 1m
+  concurrency: 10
+  log_level: info
+
+# CA Configuration - Inline Certificates
+# Embeds CA certificates directly in config
+ca:
+  trust_mode: "custom"
+  validation_mode: "chain"
+
+  # Inline PEM-encoded CA certificates
+  inline_certs:
+    - |
+      -----BEGIN CERTIFICATE-----
+      MIIDXTCCAkWgAwIBAgIJAKL0UG+mRKUzMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
+      BAYTAlVTMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBX
+      ... (your internal root CA certificate) ...
+      -----END CERTIFICATE-----
+    - |
+      -----BEGIN CERTIFICATE-----
+      MIIDYTCCAkmgAwIBAgIJAKL0UG+mRKU0MA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
+      BAYTAlVTMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBX
+      ... (your internal intermediate CA certificate) ...
+      -----END CERTIFICATE-----
+
+certificates:
+  - hostname: "internal-api.corp"
+    port: 443
+    tags:
+      - internal
+      - kubernetes
+    notes: "Internal service with inline CA"

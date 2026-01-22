@@ -18,6 +18,10 @@ rules:
   - apiGroups: [""]
     resources: ["secrets"]
     verbs: ["get", "list", "watch"]
+  # ConfigMaps for CA bundles (Phase 2)
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
   # Events for debugging and failure detection
   - apiGroups: [""]
     resources: ["events"]

@@ -1,0 +1,41 @@
+# Example: CA Validation with Custom Internal CA
+# This configuration validates certificates against a custom internal CA.
+
+api:
+  endpoint: "https://api.certwatch.app"
+  key: "cw_xxxxxxxx_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  timeout: 30s
+
+agent:
+  name: "internal-monitor"
+  sync_interval: 5m
+  scan_interval: 1m
+  concurrency: 10
+  log_level: info
+
+# CA Configuration - Custom Trust Mode
+# Uses only custom CA certificates for validation
+ca:
+  trust_mode: "custom"      # Use only custom CAs
+  validation_mode: "chain"  # Full chain validation
+
+  # CA bundle files (PEM format)
+  ca_bundles:
+    - "/etc/ssl/certs/internal-root-ca.pem"
+    - "/etc/ssl/certs/internal-intermediate-ca.pem"
+
+certificates:
+  # Monitor internal services with custom CA
+  - hostname: "internal-api.corp"
+    port: 443
+    tags:
+      - internal
+      - api
+    notes: "Internal API - validated with internal CA"
+
+  - hostname: "gitlab.corp"
+    port: 443
+    tags:
+      - internal
+      - git
+    notes: "Internal GitLab - validated with internal CA"

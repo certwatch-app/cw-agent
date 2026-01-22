@@ -1,0 +1,36 @@
+# Example: CA Validation with System Trust Store
+# This configuration validates certificates against the operating system's trusted CA store.
+
+api:
+  endpoint: "https://api.certwatch.app"
+  key: "cw_xxxxxxxx_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  timeout: 30s
+
+agent:
+  name: "production-monitor"
+  sync_interval: 5m
+  scan_interval: 1m
+  concurrency: 10
+  log_level: info
+
+# CA Configuration - System Trust Mode
+# Uses the operating system's trusted CA certificates
+ca:
+  trust_mode: "system"      # Use OS trust store
+  validation_mode: "chain"  # Full chain validation
+
+certificates:
+  # Monitor public websites (validated against system CAs)
+  - hostname: "www.google.com"
+    port: 443
+    tags:
+      - external
+      - public
+    notes: "Google - validated with system CAs"
+
+  - hostname: "api.github.com"
+    port: 443
+    tags:
+      - external
+      - api
+    notes: "GitHub API - validated with system CAs"

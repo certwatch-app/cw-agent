@@ -1,0 +1,41 @@
+# Example: CA Validation with Combined Trust (System + Custom)
+# This configuration validates certificates against both system CAs and custom CAs.
+
+api:
+  endpoint: "https://api.certwatch.app"
+  key: "cw_xxxxxxxx_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  timeout: 30s
+
+agent:
+  name: "hybrid-monitor"
+  sync_interval: 5m
+  scan_interval: 1m
+  concurrency: 10
+  log_level: info
+
+# CA Configuration - Combined Trust Mode
+# Trusts both system CAs and custom CAs
+ca:
+  trust_mode: "combined"    # Trust both system and custom CAs
+  validation_mode: "chain"  # Full chain validation
+
+  # Add custom CAs on top of system trust store
+  ca_bundles:
+    - "/etc/ssl/certs/internal-root-ca.pem"
+
+certificates:
+  # Monitor public services (validated with system CAs)
+  - hostname: "www.google.com"
+    port: 443
+    tags:
+      - external
+      - public
+    notes: "Public service - uses system CA"
+
+  # Monitor internal services (validated with custom CA)
+  - hostname: "internal-api.corp"
+    port: 443
+    tags:
+      - internal
+      - api
+    notes: "Internal service - uses custom CA"

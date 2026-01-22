@@ -118,6 +118,36 @@ var (
 		},
 	)
 
+	SyncRetries = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "certwatch",
+			Subsystem: "sync",
+			Name:      "retries_total",
+			Help:      "Total number of sync retry attempts",
+		},
+		[]string{"attempt"}, // Attempt number (1, 2, 3, etc.)
+	)
+
+	SyncPayloadBytes = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Namespace: "certwatch",
+			Subsystem: "sync",
+			Name:      "payload_bytes",
+			Help:      "Size of sync request payload in bytes",
+			Buckets:   prometheus.ExponentialBuckets(1024, 2, 10), // 1KB to 512KB
+		},
+	)
+
+	CircuitBreakerState = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "certwatch",
+			Subsystem: "sync",
+			Name:      "circuit_breaker_state",
+			Help:      "Circuit breaker state (0=closed, 1=open, 2=half-open)",
+		},
+		[]string{"state"}, // "closed", "open", "half-open"
+	)
+
 	// Heartbeat metrics
 	HeartbeatTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
@@ -167,6 +197,27 @@ var (
 			Help:      "Total uptime of the agent in seconds",
 		},
 	)
+
+	// CA validation metrics
+	CertificateCAValidation = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "certwatch",
+			Subsystem: "certificate",
+			Name:      "ca_validation",
+			Help:      "CA validation status (1=valid, 0=invalid)",
+		},
+		[]string{"hostname", "port", "validation_mode"},
+	)
+
+	CertificateTrustedRoot = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "certwatch",
+			Subsystem: "certificate",
+			Name:      "trusted_root_info",
+			Help:      "Trusted root CA information (always 1)",
+		},
+		[]string{"hostname", "port", "root_cn"},
+	)
 )
 
 // RecordCertificateMetrics updates all certificate-related metrics for a single certificate.
@@ -214,6 +265,35 @@ func RecordSyncFailure(duration float64) {
 	SyncDurationSeconds.Observe(duration)
 }
 
+// RecordSyncRetry records a retry attempt during sync.
+func RecordSyncRetry(attemptNumber int) {
+	SyncRetries.WithLabelValues(string(rune('0' + attemptNumber))).Inc()
+}
+
+// RecordSyncPayloadSize records the size of the sync payload.
+func RecordSyncPayloadSize(bytes int) {
+	SyncPayloadBytes.Observe(float64(bytes))
+}
+
+// SetCircuitBreakerState sets the circuit breaker state metric.
+// state should be "closed", "open", or "half-open"
+func SetCircuitBreakerState(state string) {
+	// Reset all states to 0
+	CircuitBreakerState.WithLabelValues("closed").Set(0)
+	CircuitBreakerState.WithLabelValues("open").Set(0)
+	CircuitBreakerState.WithLabelValues("half-open").Set(0)
+
+	// Set active state to 1
+	switch state {
+	case "closed":
+		CircuitBreakerState.WithLabelValues("closed").Set(1)
+	case "open":
+		CircuitBreakerState.WithLabelValues("open").Set(1)
+	case "half-open":
+		CircuitBreakerState.WithLabelValues("half-open").Set(1)
+	}
+}
+
 // RecordHeartbeatSuccess records a successful heartbeat operation.
 func RecordHeartbeatSuccess(duration float64) {
 	HeartbeatTotal.WithLabelValues("success").Inc()
@@ -234,4 +314,19 @@ func SetAgentInfo(version, name, agentID string) {
 // SetCertificatesConfigured sets the number of configured certificates.
 func SetCertificatesConfigured(count int) {
 	CertificatesConfigured.Set(float64(count))
+}
+
+// RecordCAValidationResult records the result of CA validation for a certificate.
+func RecordCAValidationResult(hostname, port, validationMode, trustedRoot string, valid bool) {
+	if validationMode != "" {
+		if valid {
+			CertificateCAValidation.WithLabelValues(hostname, port, validationMode).Set(1)
+		} else {
+			CertificateCAValidation.WithLabelValues(hostname, port, validationMode).Set(0)
+		}
+	}
+
+	if trustedRoot != "" {
+		CertificateTrustedRoot.WithLabelValues(hostname, port, trustedRoot).Set(1)
+	}
 }

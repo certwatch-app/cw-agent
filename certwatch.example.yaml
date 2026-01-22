@@ -30,6 +30,40 @@ agent:
   # Log level: debug, info, warn, error
   log_level: info
 
+# Certificate Authority (CA) Validation Configuration (Optional)
+# By default, certificates are validated against the system's trusted CA store.
+# Use this section to customize CA validation behavior.
+#
+# ca:
+#   # Trust Mode - which CA certificates to trust
+#   # Options:
+#   #   - "system"   : Use only the operating system's trusted CA store (default)
+#   #   - "custom"   : Use only custom CA bundles specified below
+#   #   - "combined" : Trust both system CAs and custom CA bundles
+#   trust_mode: "system"
+#
+#   # Validation Mode - how strictly to validate certificates
+#   # Options:
+#   #   - "none"  : Skip CA validation (useful for self-signed certs)
+#   #   - "basic" : Basic validation (expiry, hostname, signature)
+#   #   - "chain" : Full chain validation using x509.Verify (default)
+#   validation_mode: "chain"
+#
+#   # CA Bundle Files - paths to PEM-encoded CA certificate bundles
+#   # Used when trust_mode is "custom" or "combined"
+#   ca_bundles:
+#     - "/etc/ssl/certs/internal-ca.pem"
+#     - "/path/to/custom-root-ca.crt"
+#
+#   # Inline CA Certificates - PEM-encoded CA certificates
+#   # Useful for embedding CAs directly in config (e.g., in Kubernetes ConfigMaps)
+#   inline_certs:
+#     - |
+#       -----BEGIN CERTIFICATE-----
+#       MIIDXTCCAkWgAwIBAgIJAKL0UG+mRKUzMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
+#       ... (your CA certificate) ...
+#       -----END CERTIFICATE-----
+
 # Certificates to Monitor
 certificates:
   # Example: Monitor a web server
@@ -62,3 +96,16 @@ certificates:
     tags:
       - internal
     notes: "Internal microservice"
+
+  # Example: Per-certificate CA override
+  # You can override the global CA configuration for specific certificates
+  # - hostname: "internal-app.corp"
+  #   port: 443
+  #   tags:
+  #     - internal
+  #   notes: "Internal app with custom CA"
+  #   ca:
+  #     trust_mode: "custom"
+  #     validation_mode: "chain"
+  #     ca_bundles:
+  #       - "/etc/ssl/certs/internal-corp-ca.pem"

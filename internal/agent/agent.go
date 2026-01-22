@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/certwatch-app/cw-agent/internal/ca"
 	"github.com/certwatch-app/cw-agent/internal/config"
 	"github.com/certwatch-app/cw-agent/internal/metrics"
 	"github.com/certwatch-app/cw-agent/internal/scanner"
@@ -86,6 +87,9 @@ func (a *Agent) Run(ctx context.Context) error {
 		}()
 	}
 
+	// Phase 2: Shutdown scanner on exit (stops CA watchers)
+	defer a.scanner.Shutdown()
+
 	// Perform initial scan and sync
 	if err := a.scanAndSync(ctx); err != nil {
 		a.logger.Error("initial sync failed", zap.Error(err))
@@ -101,6 +105,12 @@ func (a *Agent) Run(ctx context.Context) error {
 		agentID = "unknown"
 	}
 	metrics.SetAgentInfo(version.GetVersion(), a.config.Agent.Name, agentID)
+
+	// Phase 2: Start CA watchers if auto_reload enabled
+	if err := a.startCAWatchers(ctx); err != nil {
+		a.logger.Error("failed to start CA watchers", zap.Error(err))
+		// Non-fatal: continue without auto-reload
+	}
 
 	// Setup tickers
 	syncTicker := time.NewTicker(a.config.Agent.SyncInterval)
@@ -169,7 +179,8 @@ func (a *Agent) scan(ctx context.Context) error {
 		zap.Int("certificates", len(a.config.Certificates)),
 	)
 
-	results := a.scanner.ScanAll(ctx, a.config.Certificates)
+	// Use ScanAllWithCA to support CA validation
+	results := a.scanner.ScanAllWithCA(ctx, a.config.Certificates, a.config.CA)
 	a.lastScan = results
 
 	// Count successes and failures, update metrics
@@ -203,6 +214,17 @@ func (a *Agent) scan(ctx context.Context) error {
 					valid,
 					chainValid,
 				)
+
+				// Record CA validation metrics if available
+				if r.Chain != nil && r.Chain.ValidationMode != "" {
+					metrics.RecordCAValidationResult(
+						r.Hostname,
+						portStr,
+						r.Chain.ValidationMode,
+						r.Chain.TrustedRoot,
+						r.Chain.ValidationError == "",
+					)
+				}
 			}
 		} else {
 			failCount++
@@ -330,6 +352,103 @@ func (a *Agent) trackUptime(ctx context.Context) {
 			metrics.AgentUptime.Inc()
 		}
 	}
+}
+
+// startCAWatchers starts watching CA sources for changes (Phase 2)
+func (a *Agent) startCAWatchers(ctx context.Context) error {
+	// Check if auto_reload is enabled (default: true if not specified)
+	if a.config.CA != nil && a.config.CA.AutoReload != nil && !*a.config.CA.AutoReload {
+		a.logger.Debug("CA auto-reload disabled")
+		return nil
+	}
+
+	// Collect all CA sources (global + per-certificate)
+	allSources, err := a.collectAllCASources()
+	if err != nil {
+		return fmt.Errorf("failed to collect CA sources: %w", err)
+	}
+
+	if len(allSources) == 0 {
+		a.logger.Debug("No CA sources to watch")
+		return nil
+	}
+
+	// Register reload callback: trigger immediate scan
+	a.scanner.OnCAReload(func(sourceID string) {
+		a.logger.Info("CA bundle reloaded, triggering scan", zap.String("source_id", sourceID))
+		// Trigger scan in background
+		go func() {
+			if err := a.scan(context.Background()); err != nil {
+				a.logger.Error("scan after CA reload failed", zap.Error(err))
+			}
+		}()
+	})
+
+	// Start watching each source
+	watchedCount := 0
+	for _, source := range allSources {
+		if err := a.scanner.StartWatching(ctx, source); err != nil {
+			a.logger.Warn("Failed to start watcher",
+				zap.String("source_id", source.ID()),
+				zap.String("source_type", source.Type()),
+				zap.Error(err))
+			// Continue with other sources
+			continue
+		}
+		watchedCount++
+	}
+
+	if watchedCount > 0 {
+		a.logger.Info("CA watchers started",
+			zap.Int("watched_sources", watchedCount),
+			zap.Int("total_sources", len(allSources)))
+	}
+
+	return nil
+}
+
+// collectAllCASources collects CA sources from global and per-certificate configs (Phase 2)
+func (a *Agent) collectAllCASources() ([]ca.CASource, error) {
+	var allSources []ca.CASource
+	seenIDs := make(map[string]bool)
+
+	// Helper to add source if not already seen
+	addSource := func(source ca.CASource) {
+		id := source.ID()
+		if !seenIDs[id] {
+			allSources = append(allSources, source)
+			seenIDs[id] = true
+		}
+	}
+
+	// Global CA sources
+	if a.config.CA != nil {
+		sources, err := a.scanner.BuildCASources(context.Background(), a.config.CA)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build global CA sources: %w", err)
+		}
+		for _, source := range sources {
+			addSource(source)
+		}
+	}
+
+	// Per-certificate CA sources
+	for _, cert := range a.config.Certificates {
+		if cert.CA != nil {
+			sources, err := a.scanner.BuildCASources(context.Background(), cert.CA)
+			if err != nil {
+				a.logger.Warn("Failed to build CA sources for certificate",
+					zap.String("hostname", cert.Hostname),
+					zap.Error(err))
+				continue
+			}
+			for _, source := range sources {
+				addSource(source)
+			}
+		}
+	}
+
+	return allSources, nil
 }
 
 // setupLogger creates a configured zap logger

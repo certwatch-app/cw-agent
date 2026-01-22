@@ -34,9 +34,13 @@ type CertificateInfo struct {
 // ChainInfo contains certificate chain information
 // Fields are ordered for optimal memory alignment
 type ChainInfo struct {
-	Issues       []ChainIssue
-	Certificates []ChainCertificate
-	Valid        bool
+	Issues          []ChainIssue
+	Certificates    []ChainCertificate
+	VerifiedChains  [][]ChainCertificate // verified certificate chains (from x509.Verify)
+	ValidationMode  string               // none, basic, chain
+	ValidationError string               // error message if validation failed
+	TrustedRoot     string               // CN of the trusted root CA
+	Valid           bool
 }
 
 // ChainIssue represents an issue with the certificate chain

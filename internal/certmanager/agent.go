@@ -14,14 +14,17 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	"github.com/certwatch-app/cw-agent/internal/ca"
 	"github.com/certwatch-app/cw-agent/internal/certmanager/config"
 	"github.com/certwatch-app/cw-agent/internal/certmanager/controller"
 	"github.com/certwatch-app/cw-agent/internal/certmanager/metrics"
 	"github.com/certwatch-app/cw-agent/internal/certmanager/types"
+	"github.com/certwatch-app/cw-agent/internal/scanner"
 	"github.com/certwatch-app/cw-agent/internal/state"
 	"github.com/certwatch-app/cw-agent/internal/sync"
 	"github.com/certwatch-app/cw-agent/internal/version"
@@ -40,6 +43,7 @@ type Agent struct {
 	logger       *zap.Logger
 	syncClient   *sync.Client
 	stateManager *state.Manager
+	scanner      *scanner.Scanner // Phase 2: Optional CA validation
 
 	// Reconcilers
 	reconciler        *controller.CertificateReconciler
@@ -109,6 +113,25 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		return fmt.Errorf("failed to add readyz check: %w", err)
+	}
+
+	// Phase 2: Initialize scanner with K8s client if CA validation is configured
+	if a.config.CA != nil {
+		a.scanner = scanner.NewWithK8sClient(
+			30*time.Second,  // timeout
+			10,              // concurrency
+			mgr.GetClient(), // K8s client from manager
+			a.logger,
+		)
+		defer a.scanner.Shutdown()
+
+		// Start CA watchers if auto_reload enabled
+		if a.config.CA.AutoReload == nil || *a.config.CA.AutoReload {
+			if err := a.startCAWatchers(ctx, mgr.GetClient()); err != nil {
+				a.logger.Warn("Failed to start CA watchers", zap.Error(err))
+				// Non-fatal: continue without auto-reload
+			}
+		}
 	}
 
 	// Create and register Certificate reconciler
@@ -479,4 +502,73 @@ func setupLogger(level string) *zap.Logger {
 		logger, _ = zap.NewProduction() //nolint:errcheck // fallback logger
 	}
 	return logger
+}
+
+// startCAWatchers starts watching CA sources for changes (Phase 2)
+func (a *Agent) startCAWatchers(ctx context.Context, k8sClient client.Client) error {
+	if a.config.CA == nil || len(a.config.CA.CASources) == 0 {
+		a.logger.Debug("No CA sources to watch")
+		return nil
+	}
+
+	// Build CA sources from config
+	sources, err := a.buildCASources(k8sClient)
+	if err != nil {
+		return fmt.Errorf("failed to build CA sources: %w", err)
+	}
+
+	// Register reload callback
+	a.scanner.OnCAReload(func(sourceID string) {
+		a.logger.Info("CA bundle reloaded",
+			zap.String("source_id", sourceID),
+			zap.String("cluster", a.config.Agent.ClusterName))
+		// Trigger immediate sync to re-validate certificates
+		go a.doSync(context.Background())
+	})
+
+	// Start watching each source
+	watchedCount := 0
+	for _, source := range sources {
+		if err := a.scanner.StartWatching(ctx, source); err != nil {
+			a.logger.Warn("Failed to start watcher",
+				zap.String("source_id", source.ID()),
+				zap.String("source_type", source.Type()),
+				zap.Error(err))
+			continue
+		}
+		watchedCount++
+	}
+
+	if watchedCount > 0 {
+		a.logger.Info("CA watchers started",
+			zap.Int("watched_sources", watchedCount),
+			zap.Int("total_sources", len(sources)))
+	}
+
+	return nil
+}
+
+// buildCASources builds CA sources from cert-manager config (Phase 2)
+func (a *Agent) buildCASources(k8sClient client.Client) ([]ca.CASource, error) {
+	var sources []ca.CASource
+	caLoader := ca.NewLoader(a.logger)
+
+	for _, srcCfg := range a.config.CA.CASources {
+		var source ca.CASource
+
+		switch srcCfg.Type {
+		case "configmap":
+			source = ca.NewConfigMapSource(k8sClient, srcCfg.Namespace, srcCfg.Name, srcCfg.Key, caLoader, a.logger)
+
+		case "secret":
+			source = ca.NewSecretSource(k8sClient, srcCfg.Namespace, srcCfg.Name, srcCfg.Key, caLoader, a.logger)
+
+		default:
+			return nil, fmt.Errorf("unsupported CA source type for cert-manager: %s (only configmap and secret are supported)", srcCfg.Type)
+		}
+
+		sources = append(sources, source)
+	}
+
+	return sources, nil
 }

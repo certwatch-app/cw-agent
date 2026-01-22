@@ -74,6 +74,29 @@ agent:
     # - production
 
 # ============================================================
+# CA Validation Configuration (Phase 2 - Optional)
+# ============================================================
+ca:
+  # Enable CA validation for certificates
+  enabled: false
+  # Trust mode: system, custom, or combined
+  trustMode: "system"
+  # Validation mode: none, basic, or chain
+  validationMode: "chain"
+  # Enable automatic hot-reload when CA bundles change
+  autoReload: true
+  # CA bundle sources (ConfigMaps and Secrets)
+  sources: []
+    # - type: configmap
+    #   namespace: certwatch
+    #   name: ca-bundle
+    #   key: ca.pem
+    # - type: secret
+    #   namespace: certwatch
+    #   name: internal-ca
+    #   key: ca.crt
+
+# ============================================================
 # Kubernetes Resources
 # ============================================================
 serviceAccount:

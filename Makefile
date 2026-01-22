@@ -158,6 +158,103 @@ run-certmanager: build-certmanager
 validate-certmanager: build-certmanager
 	./$(BINARY_DIR)/$(BINARY_CERTMANAGER) validate -c testdata/certwatch-certmanager.yaml
 
+# ============================================================================
+# CA Validation Testing Targets (Phase 2)
+# ============================================================================
+
+## test-ca: Run CA validation tests with race detection
+test-ca:
+	@echo "Running CA validation tests..."
+	$(GOTEST) -v -race ./internal/ca/...
+
+## test-ca-coverage: Run CA validation tests with coverage report
+test-ca-coverage:
+	@echo "Running CA validation tests with coverage..."
+	$(GOTEST) -v -race -coverprofile=coverage-ca.out ./internal/ca/...
+	@echo ""
+	@echo "Coverage summary:"
+	$(GOCMD) tool cover -func=coverage-ca.out | grep total
+	@echo ""
+	@echo "Generating HTML coverage report..."
+	$(GOCMD) tool cover -html=coverage-ca.out -o coverage-ca.html
+	@echo "Coverage report saved to coverage-ca.html"
+
+## test-ca-verbose: Run CA validation tests with verbose output
+test-ca-verbose:
+	@echo "Running CA validation tests (verbose)..."
+	$(GOTEST) -v -race -count=1 ./internal/ca/...
+
+# ============================================================================
+# CA Validation Integration Testing Targets (Phase 1)
+# ============================================================================
+
+## test-integration: Run CA validation integration tests
+test-integration: build
+	@echo "Running CA validation integration tests..."
+	$(GOTEST) -v -timeout 5m ./internal/ca/integration/...
+
+## test-integration-race: Run integration tests with race detector
+test-integration-race: build
+	@echo "Running integration tests with race detector..."
+	$(GOTEST) -v -race -timeout 5m ./internal/ca/integration/...
+
+## test-integration-coverage: Run integration tests with coverage
+test-integration-coverage: build
+	@echo "Running integration tests with coverage..."
+	$(GOTEST) -v -coverprofile=coverage-integration.out ./internal/ca/integration
+	@echo ""
+	@echo "Coverage summary:"
+	$(GOCMD) tool cover -func=coverage-integration.out | grep total
+	@echo ""
+	@echo "Generating HTML coverage report..."
+	$(GOCMD) tool cover -html=coverage-integration.out -o coverage-integration.html
+	@echo "Coverage report saved to coverage-integration.html"
+
+## demo-custom-ca: Run demo 1 - Custom CA for internal services
+demo-custom-ca:
+	@./internal/ca/integration/demo_scripts/demo1_custom_ca.sh
+
+## demo-mitm: Run demo 2 - MITM detection
+demo-mitm:
+	@./internal/ca/integration/demo_scripts/demo2_mitm_detection.sh
+
+## demo-hotreload: Run demo 3 - CA bundle hot-reload
+demo-hotreload:
+	@./internal/ca/integration/demo_scripts/demo3_hotreload.sh
+
+## demos: Run all integration test demos
+demos: demo-custom-ca demo-mitm demo-hotreload
+
+# ============================================================================
+# CA Validation Kubernetes Integration Testing Targets (Phase 2)
+# ============================================================================
+
+## setup-envtest: Download EnvTest binaries
+setup-envtest:
+	@echo "Setting up EnvTest binaries..."
+	@mkdir -p testdata/envtest
+	@go run sigs.k8s.io/controller-runtime/tools/setup-envtest use --bin-dir testdata/envtest
+
+## test-integration-k8s: Run Kubernetes integration tests (EnvTest)
+test-integration-k8s: build
+	@echo "Running Kubernetes integration tests with EnvTest..."
+	$(GOTEST) -v -timeout 5m -run TestIntegration_K8s ./internal/ca/integration/
+
+## test-integration-k8s-race: Run K8s integration tests with race detector
+test-integration-k8s-race: build
+	@echo "Running K8s integration tests with race detector..."
+	$(GOTEST) -v -race -timeout 5m -run TestIntegration_K8s ./internal/ca/integration/
+
+## test-integration-all: Run all integration tests (Phase 1 + Phase 2)
+test-integration-all: build
+	@echo "Running all integration tests (Phase 1 + Phase 2)..."
+	$(GOTEST) -v -timeout 10m ./internal/ca/integration/
+
+## test-integration-all-race: Run all integration tests with race detector
+test-integration-all-race: build
+	@echo "Running all integration tests with race detector..."
+	$(GOTEST) -v -race -timeout 10m ./internal/ca/integration/
+
 ## help: Show this help
 help:
 	@echo "CertWatch Agent - Available targets:"
