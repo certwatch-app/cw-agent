@@ -11,7 +11,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/certwatch-app/cw-agent/internal/ca"
 	"github.com/certwatch-app/cw-agent/internal/ca/integration/harness"
 	"github.com/certwatch-app/cw-agent/internal/config"
 	"github.com/certwatch-app/cw-agent/internal/scanner"
@@ -343,12 +342,4 @@ func TestIntegration_HotReload_CARemovedFromBundle(t *testing.T) {
 	}
 
 	t.Log("✓ Hot-reload succeeded - CA trust revoked")
-}
-
-// Helper to start file watcher for a source
-func startWatcher(ctx context.Context, source ca.CASource, s *scanner.Scanner, t *testing.T) {
-	t.Helper()
-	if err := s.StartWatching(ctx, source); err != nil {
-		t.Fatalf("Failed to start watching: %v", err)
-	}
 }

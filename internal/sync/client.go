@@ -160,6 +160,7 @@ func (c *Client) syncWithRetry(ctx context.Context, certs []config.CertificateCo
 			metrics.RecordSyncRetry(attempt + 1)
 
 			// Add jitter to prevent thundering herd
+			//nolint:gosec // G404: math/rand acceptable for retry backoff jitter; not cryptographic use
 			jitter := time.Duration(rand.Float64() * float64(backoff) * 0.1)
 			sleepDuration := backoff + jitter
 
@@ -225,7 +226,7 @@ func isClientError(err error) bool {
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
 		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-		containsMiddle(s, substr)))
+			containsMiddle(s, substr)))
 }
 
 func containsMiddle(s, substr string) bool {
@@ -291,7 +292,7 @@ func (c *Client) doHeartbeatRequest(ctx context.Context, body *HeartbeatRequest)
 	if err != nil {
 		return nil, fmt.Errorf("heartbeat request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // HTTP response body close in defer is idiomatic Go; error indicates broken connection, non-actionable
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -403,10 +404,6 @@ func (c *Client) doRequestWithCorrelation(ctx context.Context, method, path stri
 	return c.doRequestInternal(ctx, method, path, body, correlationID)
 }
 
-func (c *Client) doRequest(ctx context.Context, method, path string, body interface{}) (*SyncResponse, error) {
-	return c.doRequestInternal(ctx, method, path, body, "")
-}
-
 func (c *Client) doRequestInternal(ctx context.Context, method, path string, body interface{}, correlationID string) (*SyncResponse, error) {
 	url := c.endpoint + path
 
@@ -477,7 +474,7 @@ func (c *Client) doRequestInternal(ctx context.Context, method, path string, bod
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // HTTP response body close in defer is idiomatic Go; error indicates broken connection, non-actionable
 
 	// Handle gzip response
 	var reader io.Reader = resp.Body
@@ -486,7 +483,7 @@ func (c *Client) doRequestInternal(ctx context.Context, method, path string, bod
 		if gzErr != nil {
 			return nil, fmt.Errorf("failed to create gzip reader: %w", gzErr)
 		}
-		defer gzReader.Close()
+		defer gzReader.Close() //nolint:errcheck // Gzip reader close in defer; response already read, error non-actionable
 		reader = gzReader
 	}
 
@@ -722,7 +719,7 @@ func (c *Client) SyncCertManagerCertificates(ctx context.Context, clusterName st
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // HTTP response body close in defer is idiomatic Go; error indicates broken connection, non-actionable
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -801,7 +798,7 @@ func (c *Client) SyncCertManagerEvents(ctx context.Context, clusterName string, 
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // HTTP response body close in defer is idiomatic Go; error indicates broken connection, non-actionable
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -865,7 +862,7 @@ func (c *Client) SyncCertManagerRequests(ctx context.Context, clusterName string
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // HTTP response body close in defer is idiomatic Go; error indicates broken connection, non-actionable
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

@@ -228,6 +228,7 @@ func (h *TestCAHarness) WriteCABundle(certs []*x509.Certificate, filename string
 
 	path := filepath.Join(h.TempDir, filename)
 
+	//nolint:prealloc // Test helper with small number of certs; preallocation not critical
 	var bundle []byte
 	for _, cert := range certs {
 		certPEM := pem.EncodeToMemory(&pem.Block{

@@ -254,8 +254,6 @@ func TestPKCS12Source_PrivateKeyWarning(t *testing.T) {
 
 // TestPKCS12Source_NoCACerts tests error when PKCS12 has no CA certificates.
 func TestPKCS12Source_NoCACerts(t *testing.T) {
-	tmpDir := t.TempDir()
-
 	// Generate a regular CA certificate for testing
 	// The PKCS12 implementation will include it since IsCA=true
 	// To properly test "no CA certs", we'd need to manually create a non-CA cert
@@ -268,8 +266,6 @@ func TestPKCS12Source_NoCACerts(t *testing.T) {
 	// 2. Encoding it to PKCS12 with no CA chain
 	// 3. Verifying the source rejects it
 	// The current helper always creates CA certificates
-
-	_ = tmpDir
 }
 
 // TestPKCS12Source_PasswordPriority tests that env variable takes priority over file.

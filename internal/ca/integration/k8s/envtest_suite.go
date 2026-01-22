@@ -48,14 +48,14 @@ func (s *EnvTestSuite) Start(t *testing.T) {
 	// Create scheme with core v1 types
 	scheme := runtime.NewScheme()
 	if err := corev1.AddToScheme(scheme); err != nil {
-		s.Env.Stop()
+		s.Env.Stop() //nolint:errcheck // Test cleanup on failure; error logged but test is failing anyway
 		t.Fatalf("Failed to add corev1 to scheme: %v", err)
 	}
 
 	// Create controller-runtime client
 	c, err := client.New(cfg, client.Options{Scheme: scheme})
 	if err != nil {
-		s.Env.Stop()
+		s.Env.Stop() //nolint:errcheck // Test cleanup on failure; error logged but test is failing anyway
 		t.Fatalf("Failed to create client: %v", err)
 	}
 	s.Client = c

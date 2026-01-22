@@ -60,6 +60,7 @@ func (s *PKCS12Source) Load(ctx context.Context) ([]*x509.Certificate, error) {
 	privateKey, cert, caCerts, err := pkcs12.DecodeChain(p12Data, password)
 
 	// Clear password from memory immediately
+	//nolint:ineffassign // Intentional: clear sensitive password from memory for security
 	password = ""
 
 	if err != nil {
@@ -71,6 +72,7 @@ func (s *PKCS12Source) Load(ctx context.Context) ([]*x509.Certificate, error) {
 		s.logger.Warn("PKCS12 file contains private key - it will be ignored and zeroed from memory",
 			zap.String("path", s.path))
 		// The private key will be garbage collected, but we explicitly nil it
+		//nolint:ineffassign // Intentional: clear sensitive private key from memory for security
 		privateKey = nil
 	}
 

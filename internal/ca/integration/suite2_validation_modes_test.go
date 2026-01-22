@@ -69,10 +69,8 @@ func TestIntegration_ValidationMode_Chain(t *testing.T) {
 		// The validation will fail due to hostname mismatch.
 		if result.Chain.Valid {
 			t.Log("⚠️  Chain valid despite IP address (certificate may have IP in SAN)")
-		} else {
-			if !contains(result.Chain.ValidationError, "example.test") {
-				t.Logf("✓ Chain validation correctly failed for IP address: %s", result.Chain.ValidationError)
-			}
+		} else if !contains(result.Chain.ValidationError, "example.test") {
+			t.Logf("✓ Chain validation correctly failed for IP address: %s", result.Chain.ValidationError)
 		}
 	})
 

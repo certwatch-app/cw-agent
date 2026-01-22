@@ -23,7 +23,7 @@ import (
 // Fields are ordered for optimal memory alignment
 type Scanner struct {
 	logger       *zap.Logger
-	caLoader     *ca.Loader        // Phase 1: CA loader for validation
+	caLoader     *ca.Loader         // Phase 1: CA loader for validation
 	cacheManager *ca.CACacheManager // Phase 2: Cache manager for hot-reload
 	k8sClient    interface{}        // Phase 2: Kubernetes client (controller-runtime client.Client)
 	timeout      time.Duration
@@ -105,13 +105,16 @@ func (s *Scanner) Scan(ctx context.Context, hostname string, port int) ScanResul
 		InsecureSkipVerify: true, //nolint:gosec // We validate manually to inspect the full certificate chain
 	}
 
-	// Create dialer with timeout
-	dialer := &net.Dialer{
-		Timeout: s.timeout,
+	// Create context-aware TLS dialer
+	tlsDialer := &tls.Dialer{
+		NetDialer: &net.Dialer{
+			Timeout: s.timeout,
+		},
+		Config: tlsConfig,
 	}
 
 	// Establish connection with context
-	conn, err := tls.DialWithDialer(dialer, "tcp", addr, tlsConfig)
+	netConn, err := tlsDialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		result.Success = false
 		result.Error = fmt.Sprintf("connection failed: %v", err)
@@ -122,7 +125,15 @@ func (s *Scanner) Scan(ctx context.Context, hostname string, port int) ScanResul
 		)
 		return result
 	}
-	defer conn.Close()
+	defer netConn.Close() //nolint:errcheck // TLS connection close in defer; certificate data already extracted, close error non-actionable
+
+	// Type assert to TLS connection
+	conn, ok := netConn.(*tls.Conn)
+	if !ok {
+		result.Success = false
+		result.Error = "connection is not a TLS connection"
+		return result
+	}
 
 	// Get peer certificates
 	state := conn.ConnectionState()
@@ -329,13 +340,16 @@ func (s *Scanner) ScanWithCA(ctx context.Context, hostname string, port int, caC
 		InsecureSkipVerify: true, //nolint:gosec // We validate manually to inspect the full certificate chain
 	}
 
-	// Create dialer with timeout
-	dialer := &net.Dialer{
-		Timeout: s.timeout,
+	// Create context-aware TLS dialer
+	tlsDialer := &tls.Dialer{
+		NetDialer: &net.Dialer{
+			Timeout: s.timeout,
+		},
+		Config: tlsConfig,
 	}
 
 	// Establish connection with context
-	conn, err := tls.DialWithDialer(dialer, "tcp", addr, tlsConfig)
+	netConn, err := tlsDialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		result.Success = false
 		result.Error = fmt.Sprintf("connection failed: %v", err)
@@ -346,7 +360,15 @@ func (s *Scanner) ScanWithCA(ctx context.Context, hostname string, port int, caC
 		)
 		return result
 	}
-	defer conn.Close()
+	defer netConn.Close() //nolint:errcheck // TLS connection close in defer; certificate data already extracted, close error non-actionable
+
+	// Type assert to TLS connection
+	conn, ok := netConn.(*tls.Conn)
+	if !ok {
+		result.Success = false
+		result.Error = "connection is not a TLS connection"
+		return result
+	}
 
 	// Get peer certificates
 	state := conn.ConnectionState()
@@ -578,7 +600,7 @@ func (s *Scanner) createCASource(ctx context.Context, cfg *config.CASourceConfig
 
 	case "configmap":
 		if s.k8sClient == nil {
-			return nil, fmt.Errorf("Kubernetes client not available for configmap source (use NewWithK8sClient)")
+			return nil, fmt.Errorf("kubernetes client not available for configmap source (use NewWithK8sClient)")
 		}
 		// Type assert k8sClient to client.Client
 		k8sClient, ok := s.k8sClient.(client.Client)
@@ -589,7 +611,7 @@ func (s *Scanner) createCASource(ctx context.Context, cfg *config.CASourceConfig
 
 	case "secret":
 		if s.k8sClient == nil {
-			return nil, fmt.Errorf("Kubernetes client not available for secret source (use NewWithK8sClient)")
+			return nil, fmt.Errorf("kubernetes client not available for secret source (use NewWithK8sClient)")
 		}
 		// Type assert k8sClient to client.Client
 		k8sClient, ok := s.k8sClient.(client.Client)

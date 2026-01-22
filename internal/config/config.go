@@ -20,10 +20,10 @@ type Config struct {
 
 // APIConfig contains API connection settings
 type APIConfig struct {
-	Endpoint      string               `mapstructure:"endpoint"`
-	Key           string               `mapstructure:"key"`
-	Timeout       time.Duration        `mapstructure:"timeout"`
-	Retry         RetryConfig          `mapstructure:"retry"`
+	Endpoint       string               `mapstructure:"endpoint"`
+	Key            string               `mapstructure:"key"`
+	Timeout        time.Duration        `mapstructure:"timeout"`
+	Retry          RetryConfig          `mapstructure:"retry"`
 	CircuitBreaker CircuitBreakerConfig `mapstructure:"circuit_breaker"`
 }
 
@@ -56,13 +56,13 @@ type AgentConfig struct {
 
 // CAConfig contains Certificate Authority validation settings
 type CAConfig struct {
-	TrustMode      string           `mapstructure:"trust_mode"`       // system, custom, combined
-	ValidationMode string           `mapstructure:"validation_mode"`  // none, basic, chain
-	CABundles      []string         `mapstructure:"ca_bundles"`       // paths to CA bundle files (Phase 1, backward compat)
-	InlineCerts    []string         `mapstructure:"inline_certs"`     // inline PEM-encoded CA certificates (Phase 1, backward compat)
-	CASources      []CASourceConfig `mapstructure:"ca_sources"`       // Phase 2: configurable CA sources
-	AutoReload     *bool            `mapstructure:"auto_reload"`      // Phase 2: enable hot-reload (default: true)
-	ReloadInterval time.Duration    `mapstructure:"reload_interval"`  // Phase 2: fallback polling interval (default: 0 = watch only)
+	TrustMode      string           `mapstructure:"trust_mode"`      // system, custom, combined
+	ValidationMode string           `mapstructure:"validation_mode"` // none, basic, chain
+	CABundles      []string         `mapstructure:"ca_bundles"`      // paths to CA bundle files (Phase 1, backward compat)
+	InlineCerts    []string         `mapstructure:"inline_certs"`    // inline PEM-encoded CA certificates (Phase 1, backward compat)
+	CASources      []CASourceConfig `mapstructure:"ca_sources"`      // Phase 2: configurable CA sources
+	AutoReload     *bool            `mapstructure:"auto_reload"`     // Phase 2: enable hot-reload (default: true)
+	ReloadInterval time.Duration    `mapstructure:"reload_interval"` // Phase 2: fallback polling interval (default: 0 = watch only)
 }
 
 // CASourceConfig defines a CA bundle source (Phase 2)
@@ -131,8 +131,8 @@ func setDefaults(v *viper.Viper) {
 	// CA defaults (only if ca section exists)
 	v.SetDefault("ca.trust_mode", "system")
 	v.SetDefault("ca.validation_mode", "chain")
-	v.SetDefault("ca.auto_reload", true)      // Phase 2: enable hot-reload by default
-	v.SetDefault("ca.reload_interval", "0s")  // Phase 2: watch-only, no polling
+	v.SetDefault("ca.auto_reload", true)     // Phase 2: enable hot-reload by default
+	v.SetDefault("ca.reload_interval", "0s") // Phase 2: watch-only, no polling
 }
 
 // Validate validates the configuration

@@ -38,7 +38,8 @@ func NewTestHTTPSServer(t *testing.T, cert *x509.Certificate, key *rsa.PrivateKe
 	t.Helper()
 
 	// Create listener on random available port
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	lc := net.ListenConfig{}
+	listener, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("Failed to create listener: %v", err)
 	}
@@ -74,11 +75,11 @@ func NewTestHTTPSServer(t *testing.T, cert *x509.Certificate, key *rsa.PrivateKe
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Test HTTPS Server\n"))
+		w.Write([]byte("Test HTTPS Server\n")) //nolint:errcheck // Test HTTP handler; response headers sent, error indicates broken client connection
 	})
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK\n"))
+		w.Write([]byte("OK\n")) //nolint:errcheck // Test HTTP handler; response headers sent, error indicates broken client connection
 	})
 
 	// Create HTTP server
@@ -133,9 +134,18 @@ func (s *TestHTTPSServer) WaitReady(t *testing.T, timeout time.Duration) {
 
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		resp, err := client.Get(fmt.Sprintf("%s/health", s.URL))
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/health", s.URL), nil)
+		if err != nil {
+			cancel()
+			time.Sleep(50 * time.Millisecond)
+			continue
+		}
+
+		resp, err := client.Do(req)
+		cancel()
 		if err == nil {
-			resp.Body.Close()
+			resp.Body.Close() //nolint:errcheck // Test server health check; error indicates broken connection, non-actionable
 			if resp.StatusCode == http.StatusOK {
 				return // Server is ready
 			}
@@ -156,7 +166,7 @@ func (s *TestHTTPSServer) Stop() {
 			s.t.Logf("Server shutdown error: %v", err)
 		}
 
-		s.Listener.Close()
+		s.Listener.Close() //nolint:errcheck // Test server cleanup; error non-actionable during shutdown
 	})
 }
 

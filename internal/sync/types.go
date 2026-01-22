@@ -31,9 +31,9 @@ type CertificateSyncData struct {
 	SerialNumber      string           `json:"serial_number,omitempty"`
 	FingerprintSHA256 string           `json:"fingerprint_sha256,omitempty"`
 	LastError         string           `json:"last_error,omitempty"`
-	ValidationMode    string           `json:"validation_mode,omitempty"`    // none, basic, chain
-	ValidationError   string           `json:"validation_error,omitempty"`   // CA validation error message
-	TrustedRoot       string           `json:"trusted_root,omitempty"`       // CN of trusted root CA
+	ValidationMode    string           `json:"validation_mode,omitempty"`  // none, basic, chain
+	ValidationError   string           `json:"validation_error,omitempty"` // CA validation error message
+	TrustedRoot       string           `json:"trusted_root,omitempty"`     // CN of trusted root CA
 	Tags              []string         `json:"tags,omitempty"`
 	SANList           []string         `json:"san_list,omitempty"`
 	ChainIssues       []ChainIssueData `json:"chain_issues,omitempty"`

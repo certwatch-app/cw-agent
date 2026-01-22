@@ -3,6 +3,7 @@ package harness
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -30,11 +31,19 @@ func NewMetricsScraper(t *testing.T, metricsPort int) *MetricsScraper {
 // ScrapeMetrics fetches all metrics from the /metrics endpoint.
 // Returns the raw Prometheus text format metrics.
 func (m *MetricsScraper) ScrapeMetrics() (string, error) {
-	resp, err := http.Get(m.BaseURL + "/metrics")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, m.BaseURL+"/metrics", nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch metrics: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // Test metrics scraper; error indicates broken connection, non-actionable
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("metrics endpoint returned status %d", resp.StatusCode)

@@ -43,6 +43,7 @@ type CircuitBreaker struct {
 // timeout: duration to wait before transitioning from open to half-open
 func NewCircuitBreaker(maxFailures int, timeout time.Duration, logger *zap.Logger) *CircuitBreaker {
 	cb := &CircuitBreaker{
+		//nolint:gosec // G115: Integer overflow impossible; maxFailures is small constant (5-10) from config
 		maxFailures: int32(maxFailures),
 		timeout:     timeout,
 		logger:      logger,
@@ -93,6 +94,7 @@ func (cb *CircuitBreaker) attemptCall(ctx context.Context, fn func() error) erro
 
 // recordFailure increments the failure count and opens the circuit if threshold is reached
 func (cb *CircuitBreaker) recordFailure() {
+	//nolint:gosec // G115: Integer overflow impossible; circuit opens at maxFailures (~5-10), counters reset on state change
 	failureCount := cb.failureCount.Add(1)
 	cb.lastFailureTime.Store(time.Now())
 	cb.successCount.Store(0)
@@ -150,10 +152,11 @@ func (cb *CircuitBreaker) setState(newState CircuitState) {
 		)
 
 		// Reset counters on state change
-		if newState == StateClosed {
+		switch newState {
+		case StateClosed:
 			cb.failureCount.Store(0)
 			cb.successCount.Store(0)
-		} else if newState == StateHalfOpen {
+		case StateHalfOpen:
 			cb.successCount.Store(0)
 		}
 	}

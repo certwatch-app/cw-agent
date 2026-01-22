@@ -18,7 +18,7 @@ import (
 // automatic invalidation when sources change.
 type CACacheManager struct {
 	mu              sync.RWMutex
-	pools           map[string]*cachedPool       // keyed by composite source ID
+	pools           map[string]*cachedPool        // keyed by composite source ID
 	watchers        map[string]context.CancelFunc // keyed by source ID
 	loader          *Loader
 	logger          *zap.Logger
@@ -177,7 +177,10 @@ func (m *CACacheManager) StartWatching(ctx context.Context, source CASource) err
 	}
 
 	// Create watcher based on source type
-	var watcher interface{ Start(context.Context) error; Stop() error }
+	var watcher interface {
+		Start(context.Context) error
+		Stop() error
+	}
 	var err error
 
 	onChange := func() {

@@ -52,12 +52,12 @@ func TestBuildSyncRequest_PopulatesValidationFields(t *testing.T) {
 			Success:   true,
 			ScannedAt: now,
 			Certificate: &scanner.CertificateInfo{
-				Subject:            "CN=example.com",
-				Issuer:             "CN=Test CA",
-				SerialNumber:       "123456",
-				FingerprintSHA256:  "abc123",
-				NotBefore:          now.Add(-24 * time.Hour),
-				NotAfter:           now.Add(90 * 24 * time.Hour),
+				Subject:           "CN=example.com",
+				Issuer:            "CN=Test CA",
+				SerialNumber:      "123456",
+				FingerprintSHA256: "abc123",
+				NotBefore:         now.Add(-24 * time.Hour),
+				NotAfter:          now.Add(90 * 24 * time.Hour),
 			},
 			Chain: &scanner.ChainInfo{
 				Valid:           true,
@@ -110,9 +110,9 @@ func TestBuildSyncRequest_PopulatesValidationError(t *testing.T) {
 			Success:   true,
 			ScannedAt: now,
 			Certificate: &scanner.CertificateInfo{
-				Subject:       "CN=internal.corp",
-				NotBefore:     now.Add(-24 * time.Hour),
-				NotAfter:      now.Add(90 * 24 * time.Hour),
+				Subject:   "CN=internal.corp",
+				NotBefore: now.Add(-24 * time.Hour),
+				NotAfter:  now.Add(90 * 24 * time.Hour),
 			},
 			Chain: &scanner.ChainInfo{
 				Valid:           false,

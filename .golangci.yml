@@ -1,6 +1,8 @@
 # golangci-lint configuration
 # https://golangci-lint.run/usage/configuration/
 
+version: 2
+
 run:
   timeout: 5m
   issues-exit-code: 1
@@ -9,37 +11,57 @@ run:
 linters:
   enable:
     - errcheck
-    - gosimple
     - govet
     - ineffassign
-    - staticcheck
+    - staticcheck  # Includes gosimple rules in v2.x
     - unused
-    - gofmt
-    - goimports
     - misspell
     - unconvert
     - bodyclose
     - noctx
     - gosec
     - prealloc
-    - copyloopvar  # Replacement for deprecated exportloopref
+    - copyloopvar
     - gocritic
+
+  exclusions:
+    rules:
+      # Exclude all linters from test files
+      - path: '(.+)_test\.go'
+        linters:
+          - errcheck
+          - gocritic
+          - gosec
+
+      # Exclude gosec from test infrastructure (harness and integration helpers)
+      - path: '(harness|integration)/'
+        linters:
+          - gosec
+
+      # Exclude gosec file permissions from init command (creates user config files)
+      - path: 'internal/cmd/initcmd/'
+        linters:
+          - gosec
+        text: 'G301'
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
 
 linters-settings:
   errcheck:
     check-type-assertions: true
     check-blank: true
+    exclude-functions:
+      - (io.Closer).Close
+      - (*go.uber.org/zap.Logger).Sync
+      - (os.File).Close
 
   govet:
     enable-all: true
     disable:
       - fieldalignment  # Disabled: manual field ordering for clarity over memory optimization
-
-  gofmt:
-    simplify: true
-
-  goimports:
-    local-prefixes: github.com/certwatch-app/cw-agent
 
   misspell:
     locale: US
@@ -57,13 +79,13 @@ linters-settings:
     disabled-checks:
       - hugeParam
 
-issues:
-  exclude-rules:
-    # Exclude some linters from running on tests files
-    - path: _test\.go
-      linters:
-        - gosec
-        - gocritic
+formatters-settings:
+  gofmt:
+    simplify: true
 
+  goimports:
+    local-prefixes: github.com/certwatch-app/cw-agent
+
+issues:
   max-issues-per-linter: 50
   max-same-issues: 10

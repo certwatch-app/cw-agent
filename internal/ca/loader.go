@@ -132,6 +132,7 @@ func (l *Loader) loadPEMFile(pool *x509.CertPool, path string) (int, error) {
 	}
 
 	// Read file
+	//nolint:gosec // G304: File path from config, validated by validateCABundle (symlink/permission checks)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {

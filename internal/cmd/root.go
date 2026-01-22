@@ -42,7 +42,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose output")
 
 	// Bind flags to viper
-	//nolint:errcheck // error is ignored because the flag is guaranteed to exist
+	//nolint:errcheck,gosec // BindPFlag only fails on programmer error (invalid args)
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 }
 
@@ -64,7 +64,7 @@ func initConfig() {
 	viper.AutomaticEnv()
 
 	// Explicitly bind API key from environment variable
-	//nolint:errcheck // BindEnv always succeeds when args are valid
+	//nolint:errcheck,gosec // BindEnv only fails on programmer error (invalid args)
 	viper.BindEnv("api.key", "CW_API_KEY")
 
 	// If a config file is found, read it in

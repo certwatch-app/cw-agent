@@ -170,6 +170,7 @@ func TestIntegration_K8s_ConfigMapHotReload_ResourceVersion(t *testing.T) {
 
 	// Update ConfigMap (add Root CA)
 	t.Log("Updating ConfigMap with complete CA bundle...")
+	//nolint:gocritic // False positive: creating NEW slice by combining two slices, not appending to same slice
 	bundlePEM := append(caHarness.RootPEM, caHarness.IntermediatePEM...)
 	cm = suite.UpdateConfigMapCA(t, cm, "ca.crt", bundlePEM)
 	newVersion := cm.ResourceVersion
@@ -272,6 +273,7 @@ func TestIntegration_K8s_SecretHotReload_ResourceVersion(t *testing.T) {
 
 	// Update Secret (add Root CA)
 	t.Log("Updating Secret with complete CA bundle...")
+	//nolint:gocritic // False positive: creating NEW slice by combining two slices, not appending to same slice
 	bundlePEM := append(caHarness.RootPEM, caHarness.IntermediatePEM...)
 	secret = suite.UpdateSecretCA(t, secret, "ca.crt", bundlePEM)
 	newVersion := secret.ResourceVersion
@@ -325,6 +327,7 @@ func TestIntegration_K8s_ConfigMap_MultipleCAs(t *testing.T) {
 	caHarness := harness.NewTestCAHarness(t)
 
 	// Bundle with Root + Intermediate + Evil CA
+	//nolint:gocritic // False positive: creating NEW slice by combining two slices, not appending to same slice
 	bundlePEM := append(caHarness.RootPEM, caHarness.IntermediatePEM...)
 	bundlePEM = append(bundlePEM, caHarness.EvilRootPEM...)
 
@@ -406,6 +409,7 @@ func TestIntegration_K8s_ConfigMap_ConcurrentUpdates(t *testing.T) {
 
 	// Perform 3 rapid updates
 	for i := 0; i < 3; i++ {
+		//nolint:gocritic // False positive: creating NEW slice by combining two slices, not appending to same slice
 		updatePEM := append(caHarness.RootPEM, []byte(fmt.Sprintf("# Update %d\n", i))...)
 		cm = suite.UpdateConfigMapCA(t, cm, "ca.crt", updatePEM)
 		time.Sleep(1 * time.Second) // Faster than polling interval

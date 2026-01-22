@@ -61,22 +61,27 @@ clean:
 	@rm -rf $(BINARY_DIR)
 	@rm -f coverage.out
 
-## test: Run tests
+## test: Run tests (skip K8s integration tests)
 test:
-	@echo "Running tests..."
-	$(GOTEST) -v -race ./...
+	@echo "Running tests (short mode, skips K8s integration)..."
+	$(GOTEST) -v -race -short ./...
 
-## test-coverage: Run tests with coverage
+## test-coverage: Run tests with coverage (skip K8s integration tests)
 test-coverage:
 	@echo "Running tests with coverage..."
-	$(GOTEST) -v -race -coverprofile=coverage.out ./...
+	$(GOTEST) -v -race -short -coverprofile=coverage.out ./...
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html
 
 ## lint: Run linter
 lint:
 	@echo "Running linter..."
 	@which golangci-lint > /dev/null || (echo "golangci-lint not found, install from https://golangci-lint.run/usage/install/" && exit 1)
-	golangci-lint run ./...
+	@GOBIN=$$(go env GOPATH)/bin; \
+	if [ -f "$$GOBIN/golangci-lint" ]; then \
+		$$GOBIN/golangci-lint run ./...; \
+	else \
+		golangci-lint run ./...; \
+	fi
 
 ## fmt: Format code
 fmt:
