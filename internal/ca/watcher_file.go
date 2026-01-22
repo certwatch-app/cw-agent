@@ -61,7 +61,7 @@ func (w *FileWatcher) watchLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			w.logger.Debug("File watcher stopped (context cancelled)",
+			w.logger.Debug("File watcher stopped (context canceled)",
 				zap.String("path", w.path))
 			return
 

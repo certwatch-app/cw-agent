@@ -132,6 +132,7 @@ func (cb *CircuitBreaker) recordSuccess() {
 
 // getState returns the current state of the circuit breaker
 func (cb *CircuitBreaker) getState() CircuitState {
+	//nolint:errcheck // Type assertion safe: state always initialized to StateClosed and only modified by CircuitBreaker methods
 	return cb.state.Load().(CircuitState)
 }
 
@@ -140,6 +141,7 @@ func (cb *CircuitBreaker) setState(newState CircuitState) {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
 
+	//nolint:errcheck // Type assertion safe: state always initialized to StateClosed and only modified by CircuitBreaker methods
 	oldState := cb.state.Load().(CircuitState)
 	if oldState != newState {
 		cb.state.Store(newState)
@@ -169,6 +171,7 @@ func (cb *CircuitBreaker) getLastFailureTime() time.Time {
 	if t == nil {
 		return time.Time{}
 	}
+	//nolint:errcheck // Type assertion safe: lastFailureTime only stores time.Time values
 	return t.(time.Time)
 }
 

@@ -80,7 +80,7 @@ func (w *K8sWatcher) pollLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			w.logger.Debug("Kubernetes watcher stopped (context cancelled)")
+			w.logger.Debug("Kubernetes watcher stopped (context canceled)")
 			return
 
 		case <-w.stopCh:

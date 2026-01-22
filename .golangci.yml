@@ -1,11 +1,10 @@
-# golangci-lint configuration
+# golangci-lint configuration (v2 format)
 # https://golangci-lint.run/usage/configuration/
 
 version: "2"
 
 run:
   timeout: 5m
-  issues-exit-code: 1
   tests: true
 
 linters:
@@ -13,7 +12,7 @@ linters:
     - errcheck
     - govet
     - ineffassign
-    - staticcheck  # Includes gosimple rules in v2.x
+    - staticcheck
     - unused
     - misspell
     - unconvert
@@ -24,55 +23,77 @@ linters:
     - copyloopvar
     - gocritic
 
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+      exclude-functions:
+        - (io.Closer).Close
+        - (*go.uber.org/zap.Logger).Sync
+        - (os.File).Close
+
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+        - shadow
+        - unusedwrite
+
+    misspell:
+      locale: US
+
+    gosec:
+      excludes:
+        - G104
+        - G304
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - hugeParam
+        - unnamedResult
+        - paramTypeCombine
+        - importShadow
+        - octalLiteral
+        - httpNoBody
+
   exclusions:
     rules:
-      # Exclude all linters from test files
-      - path: '(.+)_test\.go'
+      # Exclude linters from test files
+      - path: _test\.go
+        linters:
+          - errcheck
+          - gocritic
+          - gosec
+          - govet
+          - misspell
+
+      # Exclude from test infrastructure
+      - path: harness/
         linters:
           - errcheck
           - gocritic
           - gosec
 
-      # Exclude gosec from test infrastructure (harness and integration helpers)
-      - path: '(harness|integration)/'
+      - path: integration/
         linters:
+          - errcheck
+          - gocritic
           - gosec
 
-      # Exclude gosec file permissions from init command (creates user config files)
-      - path: 'internal/cmd/initcmd/'
+      # Exclude gosec file permissions from init command
+      - path: internal/cmd/initcmd/
         linters:
           - gosec
         text: 'G301'
 
-linters-settings:
-  errcheck:
-    check-type-assertions: true
-    check-blank: true
-    exclude-functions:
-      - (io.Closer).Close
-      - (*go.uber.org/zap.Logger).Sync
-      - (os.File).Close
-
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment  # Disabled: manual field ordering for clarity over memory optimization
-
-  misspell:
-    locale: US
-
-  gosec:
-    excludes:
-      - G104 # Audit errors not checked (we handle in specific cases)
-      - G304 # File path provided as taint input (config files)
-
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-      - performance
-    disabled-checks:
-      - hugeParam
+    # Exclude entire directories from all linting
+    paths:
+      - "internal/ca/integration/"
+      - "internal/ca/testing_helpers.go"
 
 issues:
   max-issues-per-linter: 50

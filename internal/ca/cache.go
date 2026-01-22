@@ -163,7 +163,7 @@ func (m *CACacheManager) GetOrLoad(ctx context.Context, sources []CASource, trus
 }
 
 // StartWatching starts watching a CA source for changes and triggers reload on change.
-// The watcher runs in a background goroutine until the context is cancelled or StopWatching is called.
+// The watcher runs in a background goroutine until the context is canceled or StopWatching is called.
 func (m *CACacheManager) StartWatching(ctx context.Context, source CASource) error {
 	sourceID := source.ID()
 
