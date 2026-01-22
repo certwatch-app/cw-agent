@@ -106,7 +106,9 @@ func (s *PKCS12Source) getPassword() (string, error) {
 	if s.passwordEnv != "" {
 		password := os.Getenv(s.passwordEnv)
 		if password == "" {
-		s.logger.Debug("Retrieved password from environment variable")
+			return "", fmt.Errorf("environment variable %s is empty or not set", s.passwordEnv)
+		}
+		// Log only the variable name, never the password value
 		s.logger.Debug("Retrieved password from environment variable",
 			zap.String("env_var", s.passwordEnv))
 		return password, nil
@@ -125,8 +127,9 @@ func (s *PKCS12Source) getPassword() (string, error) {
 		password := strings.TrimSpace(string(data))
 		if password == "" {
 			return "", fmt.Errorf("password file is empty: %s", s.passwordFile)
-		s.logger.Debug("Retrieved password from file")
-		s.logger.Debug("Retrieved password from password file")
+		}
+		s.logger.Debug("Retrieved password from password file",
+			zap.String("password_file", s.passwordFile))
 		return password, nil
 	}
 

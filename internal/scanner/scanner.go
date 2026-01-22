@@ -100,8 +100,10 @@ func (s *Scanner) Scan(ctx context.Context, hostname string, port int) ScanResul
 
 	// Create TLS config
 	// We intentionally skip TLS verification and validate manually to inspect the full chain
+	// This is required for a certificate monitoring tool to inspect invalid/expired certificates
 	tlsConfig := &tls.Config{
-		ServerName:         hostname,
+		ServerName: hostname,
+		// codeql[go/disabled-certificate-check] Certificate monitoring requires inspecting invalid/expired certs
 		InsecureSkipVerify: true, //nolint:gosec // We validate manually to inspect the full certificate chain
 	}
 
@@ -335,8 +337,10 @@ func (s *Scanner) ScanWithCA(ctx context.Context, hostname string, port int, caC
 
 	// Create TLS config
 	// We intentionally skip TLS verification and validate manually to inspect the full chain
+	// This is required for a certificate monitoring tool to inspect invalid/expired certificates
 	tlsConfig := &tls.Config{
-		ServerName:         hostname,
+		ServerName: hostname,
+		// codeql[go/disabled-certificate-check] Certificate monitoring requires inspecting invalid/expired certs
 		InsecureSkipVerify: true, //nolint:gosec // We validate manually to inspect the full certificate chain
 	}
 
@@ -451,6 +455,15 @@ func (s *Scanner) parseChainWithCA(certs []*x509.Certificate, hostname string, c
 				CertificateIndex: i,
 			})
 		}
+
+		// Check for weak signature algorithms
+		if isWeakSignature(cert.SignatureAlgorithm.String()) {
+			chain.Issues = append(chain.Issues, ChainIssue{
+				Type:             "weak_crypto",
+				Message:          fmt.Sprintf("Weak signature algorithm: %s", cert.SignatureAlgorithm.String()),
+				CertificateIndex: i,
+			})
+		}
 	}
 
 	// Verify hostname matches
@@ -461,18 +474,6 @@ func (s *Scanner) parseChainWithCA(certs []*x509.Certificate, hostname string, c
 				Type:             "hostname_mismatch",
 				Message:          fmt.Sprintf("Certificate does not match hostname: %v", err),
 				CertificateIndex: 0,
-			})
-		}
-	}
-			// Avoid logging potentially sensitive details contained in the error (e.g., password sources)
-
-	// Check for weak signature algorithms
-				zap.Bool("ca_validation_failed", true))
-		if isWeakSignature(cert.SignatureAlgorithm.String()) {
-			chain.Issues = append(chain.Issues, ChainIssue{
-				Type:             "weak_crypto",
-				Message:          fmt.Sprintf("Weak signature algorithm: %s", cert.SignatureAlgorithm.String()),
-				CertificateIndex: i,
 			})
 		}
 	}
