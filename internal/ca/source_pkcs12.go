@@ -126,8 +126,7 @@ func (s *PKCS12Source) getPassword() (string, error) {
 		if password == "" {
 			return "", fmt.Errorf("password file is empty: %s", s.passwordFile)
 		s.logger.Debug("Retrieved password from file")
-		s.logger.Debug("Retrieved password from file",
-			zap.String("password_file", s.passwordFile))
+		s.logger.Debug("Retrieved password from password file")
 		return password, nil
 	}
 
