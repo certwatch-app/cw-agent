@@ -464,9 +464,10 @@ func (s *Scanner) parseChainWithCA(certs []*x509.Certificate, hostname string, c
 			})
 		}
 	}
+			// Avoid logging potentially sensitive details contained in the error (e.g., password sources)
 
 	// Check for weak signature algorithms
-	for i, cert := range certs {
+				zap.Bool("ca_validation_failed", true))
 		if isWeakSignature(cert.SignatureAlgorithm.String()) {
 			chain.Issues = append(chain.Issues, ChainIssue{
 				Type:             "weak_crypto",
